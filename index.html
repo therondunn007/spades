@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d4a2e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spades">
+<link rel="icon" href="data:image/png;base64,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">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Spades</title>
+<style>
+:root{
+  --felt:#0d4a2e; --felt2:#0a3a24; --felt-edge:#08301d;
+  --gold:#d4af37; --gold-soft:#e8cf7a;
+  --ink:#14201a; --paper:#fbf9f3; --paper-dim:#efe9da;
+  --red:#b3273a; --black:#191c22;
+  --panel:#10241a; --panel2:#163526;
+  --text:#f3efe3; --muted:#c9d4c6;
+  --btn:#1d5c3a; --btn2:#26734a;
+  --danger:#a33327;
+  --shadow:0 10px 28px rgba(0,0,0,.38);
+  --radius:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:Georgia,'Times New Roman',serif;
+  background:radial-gradient(120% 90% at 50% 0%, #14663f 0%, var(--felt) 42%, var(--felt2) 78%, var(--felt-edge) 100%);
+  color:var(--text); min-height:100dvh;
+  -webkit-tap-highlight-color:transparent;
+}
+button,[role="button"],select,input{min-height:2.25rem}
+button{font-family:inherit;cursor:pointer}
+.wrap{max-width:880px;margin:0 auto;padding:10px 12px 28px}
+
+/* ---------- Top bar ---------- */
+.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;margin-right:auto}
+.brand .spade-badge{width:38px;height:38px;border-radius:10px;background:var(--paper);color:var(--black);display:grid;place-items:center;font-size:24px;line-height:1;box-shadow:var(--shadow)}
+.brand h1{font-size:22px;margin:0;letter-spacing:.4px}
+.brand small{display:block;font-size:12px;color:var(--gold-soft);font-family:Verdana,sans-serif;letter-spacing:.06em}
+.chip{font-family:Verdana,sans-serif;font-size:12px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.18);color:var(--text);padding:7px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+.chip b{color:var(--gold-soft)}
+.icon-btn{background:rgba(0,0,0,.35);color:var(--text);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:8px 14px;font-size:15px}
+.icon-btn:active{transform:scale(.97)}
+
+/* ---------- Score strip ---------- */
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:12px 0}
+.score-card{background:var(--panel);border:1px solid rgba(212,175,55,.35);border-radius:var(--radius);padding:9px 11px;box-shadow:var(--shadow)}
+.score-card .who{font-family:Verdana,sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score-card .pts{font-size:26px;font-weight:bold;line-height:1.05}
+.score-card .sub{font-family:Verdana,sans-serif;font-size:12px;color:var(--muted)}
+.score-card.me{border-color:var(--gold);background:var(--panel2)}
+.progress{height:6px;background:rgba(0,0,0,.35);border-radius:99px;margin-top:6px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--gold);border-radius:99px;transition:width .5s}
+
+/* ---------- Screens ---------- */
+.screen{display:none}
+.screen.on{display:block}
+.panel{background:var(--panel);border:1px solid rgba(212,175,55,.3);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.panel h2{margin:0 0 6px;font-size:26px}
+.panel p{line-height:1.55;margin:8px 0}
+.muted{color:var(--muted)}
+.small{font-size:13px;font-family:Verdana,sans-serif;line-height:1.6}
+.seg{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.seg button{flex:1;min-width:96px;padding:12px 8px;border-radius:12px;border:2px solid rgba(255,255,255,.2);background:rgba(0,0,0,.28);color:var(--text);font-size:16px}
+.seg button.sel{border-color:var(--gold);background:#7a5f14;color:#fff}
+.seg button .n{font-size:26px;display:block;font-weight:bold}
+.big-btn{display:block;width:100%;padding:15px;border:none;border-radius:14px;background:var(--gold);color:#231a02;font-size:19px;font-weight:bold;box-shadow:var(--shadow);margin-top:14px}
+.big-btn:active{transform:scale(.98)}
+.ghost-btn{display:block;width:100%;padding:12px;border-radius:12px;background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);font-size:16px;margin-top:9px}
+.rules{text-align:left;margin:10px 0;padding-left:20px;line-height:1.65}
+.rules li{margin:4px 0}
+
+/* ---------- Table ---------- */
+.table-zone{position:relative;margin-top:4px}
+.opponents{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
+.opp{min-width:104px;max-width:170px;flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 10px;text-align:center}
+.opp.turn{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.45)}
+.opp .nm{font-weight:bold;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opp .dt{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5}
+.opp .backs{font-size:15px;letter-spacing:2px;color:var(--gold-soft)}
+.trick-area{
+  min-height:172px;border-radius:50%/38px;border:2px solid rgba(212,175,55,.35);
+  background:radial-gradient(90% 100% at 50% 40%, rgba(255,255,255,.07), rgba(0,0,0,.22));
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:16px 10px;position:relative;
+}
+.trick-empty{font-family:Verdana,sans-serif;font-size:13px;color:var(--muted);text-align:center;padding:0 18px;line-height:1.6}
+.msg{min-height:26px;text-align:center;font-size:16.5px;margin:10px 4px 4px;line-height:1.4}
+.msg b{color:var(--gold-soft)}
+.hand-label{display:flex;justify-content:space-between;align-items:baseline;font-family:Verdana,sans-serif;font-size:12.5px;color:var(--muted);margin:8px 2px 6px;flex-wrap:wrap;gap:6px}
+.hand{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;padding-bottom:6px}
+
+/* ---------- Cards ---------- */
+.card{
+  width:62px;height:88px;border-radius:9px;background:var(--paper);color:var(--black);
+  border:1px solid #cfc8b4;box-shadow:0 4px 10px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;align-items:flex-start;padding:5px 6px;position:relative;
+  font-family:Georgia,serif;user-select:none;-webkit-user-select:none;
+}
+.card .r{font-size:19px;font-weight:bold;line-height:1}
+.card .s{font-size:19px;line-height:1.05}
+.card .big{position:absolute;inset:0;display:grid;place-items:center;font-size:34px;opacity:.92}
+.card.red{color:var(--red)}
+button.card{cursor:pointer;text-align:left}
+button.card.playable{outline:3px solid var(--gold);outline-offset:1px;transform:translateY(-6px)}
+button.card.playable:hover{transform:translateY(-11px)}
+button.card.dim{opacity:.45;cursor:not-allowed}
+.card.mini{width:54px;height:76px}
+.card.mini .r,.card.mini .s{font-size:16px}
+.card.mini .big{font-size:28px}
+.card.winning{outline:3px solid var(--gold);box-shadow:0 0 0 4px rgba(212,175,55,.35),0 4px 10px rgba(0,0,0,.35)}
+
+/* ---------- Deck styles (switchable in Menu → Card deck) ---------- */
+/* Classic is the default .card look above. Others override via [data-deck]. */
+/* Ornate Gold — cream parchment, gold double-rule border, flourishes */
+[data-deck="ornate"] .card{
+  background:linear-gradient(155deg,#fffbe9 0%,#fdf3c0 48%,#f5e19a 100%);
+  border:2px solid #a8842a;border-radius:12px;
+  box-shadow:0 5px 12px rgba(0,0,0,.42), inset 0 0 0 3px #fffdf2, inset 0 0 0 5px rgba(168,132,42,.6), inset 0 0 22px rgba(212,175,55,.28);
+  font-family:Georgia,'Times New Roman',serif;
+}
+[data-deck="ornate"] .card .r{letter-spacing:.02em;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+[data-deck="ornate"] .card .big{font-size:38px;opacity:.95;text-shadow:0 2px 6px rgba(168,132,42,.35)}
+[data-deck="ornate"] .card::after{content:"✦";position:absolute;right:5px;bottom:3px;font-size:11px;color:#a8842a;opacity:.85;line-height:1}
+[data-deck="ornate"] .card::before{content:"✦";position:absolute;left:5px;bottom:3px;font-size:11px;color:#a8842a;opacity:.85;line-height:1}
+[data-deck="ornate"] .card.red{color:#8e1f2f}
+[data-deck="ornate"] .card.winning{box-shadow:0 0 0 4px rgba(212,175,55,.4),0 5px 12px rgba(0,0,0,.42), inset 0 0 0 3px #fffdf2, inset 0 0 0 5px rgba(168,132,42,.6)}
+[data-deck="ornate"] .opp .backs{color:#e8cf7a}
+/* Plain — clean, flat, no fuss: sans type, hairline border, faint centre suit */
+[data-deck="plain"] .card{
+  background:#ffffff;border:1px solid #c9c9c9;border-radius:6px;
+  box-shadow:0 1px 3px rgba(0,0,0,.22);
+  font-family:Verdana,Arial,sans-serif;color:#22252a;
+}
+[data-deck="plain"] .card .r{font-size:18px}
+[data-deck="plain"] .card .s{font-size:17px}
+[data-deck="plain"] .card .big{font-size:30px;opacity:.14}
+[data-deck="plain"] .card.red{color:#c62828}
+[data-deck="plain"] .card.winning{box-shadow:0 0 0 4px rgba(212,175,55,.35),0 1px 3px rgba(0,0,0,.22)}
+[data-deck="plain"] .opp .backs{color:#e8e8e8}
+/* Midnight — dark navy cards, pale ink, soft glow */
+[data-deck="midnight"] .card{
+  background:linear-gradient(160deg,#26314f 0%,#171f36 60%,#10172a 100%);
+  border:1px solid #54679a;border-radius:10px;color:#edf0ff;
+  box-shadow:0 5px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.14);
+  font-family:Georgia,serif;
+}
+[data-deck="midnight"] .card .big{opacity:.9}
+[data-deck="midnight"] .card.red{color:#ff8296}
+[data-deck="midnight"] .card.winning{box-shadow:0 0 0 4px rgba(212,175,55,.45),0 5px 12px rgba(0,0,0,.5)}
+[data-deck="midnight"] .opp .backs{color:#9db1e8}
+
+/* ---------- Deck picker ---------- */
+.deck-grid{display:grid;gap:10px;margin-top:14px}
+.deck-option{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px;border-radius:14px;border:2px solid rgba(255,255,255,.18);background:rgba(0,0,0,.26);color:var(--text)}
+.deck-option.sel{border-color:var(--gold);background:rgba(212,175,55,.13)}
+.deck-option .deck-meta{flex:1;min-width:0}
+.deck-option .deck-name{font-size:17px;font-weight:bold;display:block}
+.deck-option .deck-desc{font-family:Verdana,sans-serif;font-size:12px;color:var(--muted);display:block;margin-top:2px;line-height:1.45}
+.deck-option .deck-check{font-size:19px;color:var(--gold);visibility:hidden;flex:none}
+.deck-option.sel .deck-check{visibility:visible}
+.deck-preview{display:flex;gap:5px;flex:none;padding:7px;border-radius:10px;background:rgba(0,0,0,.3)}
+/* Preview cards are self-styled (not .card) so each shows its own deck no matter which deck is active */
+.pv-card{width:34px;height:48px;border-radius:5px;padding:3px 4px;position:relative;display:flex;flex-direction:column;align-items:flex-start;background:var(--paper);color:var(--black);border:1px solid #cfc8b4;box-shadow:0 2px 5px rgba(0,0,0,.3);font-family:Georgia,serif;flex:none}
+.pv-card .r{font-size:12px;font-weight:bold;line-height:1}
+.pv-card .s{font-size:12px;line-height:1.05}
+.pv-card .big{position:absolute;inset:0;display:grid;place-items:center;font-size:19px;opacity:.92}
+.pv-card.red{color:var(--red)}
+.pv-card.pv-ornate{background:linear-gradient(155deg,#fffbe9,#f5e19a);border:2px solid #a8842a;border-radius:7px;box-shadow:0 2px 5px rgba(0,0,0,.35), inset 0 0 0 2px #fffdf2, inset 0 0 0 3px rgba(168,132,42,.6)}
+.pv-card.pv-ornate.red{color:#8e1f2f}
+.pv-card.pv-plain{background:#fff;border:1px solid #c9c9c9;border-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.2);font-family:Verdana,Arial,sans-serif;color:#22252a}
+.pv-card.pv-plain .big{opacity:.14;font-size:17px}
+.pv-card.pv-plain.red{color:#c62828}
+.pv-card.pv-midnight{background:linear-gradient(160deg,#26314f,#10172a);border:1px solid #54679a;color:#edf0ff;box-shadow:0 2px 5px rgba(0,0,0,.45)}
+.pv-card.pv-midnight.red{color:#ff8296}
+.trick-slot{display:flex;flex-direction:column;align-items:center;gap:4px;animation:deal .25s ease}
+.trick-slot .who{font-family:Verdana,sans-serif;font-size:11px;color:var(--muted)}
+@keyframes deal{from{transform:translateY(-8px) scale(.92);opacity:.3}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.trick-slot{animation:none}.progress i{transition:none}}
+
+/* ---------- Overlays ---------- */
+.overlay{position:fixed;inset:0;background:rgba(4,18,11,.72);display:none;align-items:flex-end;justify-content:center;z-index:40;padding:0}
+.overlay.on{display:flex}
+.sheet{background:var(--panel);color:var(--text);width:100%;max-width:560px;max-height:88dvh;overflow:auto;border-radius:20px 20px 0 0;border:1px solid rgba(212,175,55,.4);padding:20px 18px calc(20px + env(safe-area-inset-bottom));box-shadow:var(--shadow)}
+@media(min-width:640px){.overlay{align-items:center;padding:18px}.sheet{border-radius:20px}}
+.sheet h2{margin:0 0 4px;font-size:23px}
+.sheet h3{margin:16px 0 6px;font-size:17px}
+.bid-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(52px,1fr));gap:8px;margin:14px 0}
+.bid-grid button{padding:13px 0;font-size:19px;font-weight:bold;border-radius:11px;border:2px solid rgba(255,255,255,.2);background:rgba(0,0,0,.28);color:var(--text)}
+.bid-grid button:active{background:#7a5f14}
+.bid-grid button.nil{border-color:var(--gold-soft);color:var(--gold-soft)}
+.menu-list{display:grid;gap:9px;margin-top:14px}
+.menu-list button{padding:14px;border-radius:12px;font-size:17px;text-align:left;background:rgba(0,0,0,.26);color:var(--text);border:1px solid rgba(255,255,255,.22);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.menu-list button .hint{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted)}
+.menu-list button.primary{background:var(--gold);color:#231a02;font-weight:bold;border-color:var(--gold)}
+table.score-table{width:100%;border-collapse:collapse;font-family:Verdana,sans-serif;font-size:13.5px;margin:10px 0}
+table.score-table th,table.score-table td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.14);text-align:right}
+table.score-table th:first-child,table.score-table td:first-child{text-align:left}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#101b14;color:#f3efe3;border:1px solid var(--gold);padding:11px 16px;border-radius:999px;font-family:Verdana,sans-serif;font-size:13.5px;opacity:0;pointer-events:none;transition:.3s;z-index:60;max-width:92vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.wake-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#777;vertical-align:middle}
+.wake-dot.on{background:#57d977;box-shadow:0 0 7px #57d977}
+#wakeChip{cursor:pointer}
+.footer-note{text-align:center;margin-top:16px}
+</style>
+</head>
+<body data-deck="classic">
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="spade-badge" aria-hidden="true">♠</div>
+      <h1>Spades<small>FIRST TO 35 · SPADES LEAD ANY TIME</small></h1>
+    </div>
+    <span class="chip" id="wakeChip" title="Screen wake lock status"><span class="wake-dot" id="wakeDot"></span><span id="wakeTxt">Screen: normal</span></span>
+    <button class="icon-btn" id="menuBtn" aria-haspopup="dialog">☰ Menu</button>
+  </div>
+
+  <div class="scores" id="scoreStrip" aria-live="polite"></div>
+
+  <!-- ============ START SCREEN ============ -->
+  <section class="screen on" id="startScreen">
+    <div class="panel">
+      <h2>Pick your table</h2>
+      <p class="muted">You play against the computer. The deck is shuffled fresh for every deal, and <b>spades can be led on any trick</b> — no need to wait for them to be broken.</p>
+      <h3 style="margin:14px 0 2px">How many players?</h3>
+      <div class="seg" id="countSeg" role="group" aria-label="Number of players">
+        <button data-n="2"><span class="n">2</span>Heads-up</button>
+        <button data-n="3"><span class="n">3</span>Every player solo</button>
+        <button data-n="4" class="sel"><span class="n">4</span>Partners — you + Nate</button>
+      </div>
+      <p class="small muted" id="countExplain">4 players: 13 cards each. You and Nate are a team — your bids and tricks combine.</p>
+      <h3 style="margin:16px 0 2px">How should hands score?</h3>
+      <div class="seg" id="scoreSeg" role="group" aria-label="Scoring mode">
+        <button data-mode="bid" class="sel"><span class="n" style="font-size:19px">Bid = points</span>Make your bid, score exactly your bid</button>
+        <button data-mode="standard"><span class="n" style="font-size:19px">Standard</span>2 per trick bid + 1 per extra trick</button>
+      </div>
+      <p class="small muted" id="scoreExplain">Bid = points: bid 4 and make it, you score 4 — overtricks add nothing. Miss your bid and you lose your bid (−4). Nil still pays +10 / −10. First to 35 still wins.</p>
+      <button class="big-btn" id="dealBtn">Shuffle &amp; deal</button>
+      <button class="ghost-btn" id="howBtn1">How to play &amp; scoring</button>
+      <button class="ghost-btn" id="installBtn1">⬇ Install app — add to home screen</button>
+    </div>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section class="screen" id="gameScreen">
+    <div class="table-zone">
+      <div class="opponents" id="opponents"></div>
+      <div class="trick-area" id="trickArea"><div class="trick-empty">Bidding first — then the trick cards land here.</div></div>
+      <div class="msg" id="msg" aria-live="polite">Welcome to the table.</div>
+      <div class="hand-label"><span id="handInfo">Your hand</span><span id="trickInfo"></span></div>
+      <div class="hand" id="hand"></div>
+    </div>
+  </section>
+
+  <p class="footer-note small muted">First to <b>35 points</b> wins the game. Spades are trump and may be led at any time. Scoring is chosen before you start — <b>Bid = points</b> or <b>Standard</b> — in the start menu.</p>
+</div>
+
+<!-- ============ MENU ============ -->
+<div class="overlay" id="menuOverlay" role="dialog" aria-modal="true" aria-label="Game menu">
+  <div class="sheet">
+    <h2>Menu</h2>
+    <p class="small muted" id="menuState">No game in progress.</p>
+    <div class="menu-list">
+      <button id="restartBtn" class="primary"><span>↻ Restart game</span><span class="hint">fresh scores, fresh shuffle</span></button>
+      <button id="scoreModeBtn"><span>🏆 Scoring</span><span class="hint" id="scoreModeHint">Bid = points · first to 35</span></button>
+      <button id="setupBtn"><span>♠ New table setup</span><span class="hint">change player count</span></button>
+      <button id="deckBtn"><span>🃏 Card deck</span><span class="hint" id="deckHint">Classic</span></button>
+      <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
+      <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
+      <button id="soundBtn"><span>🔊 Sound</span><span class="hint" id="soundHint">on</span></button>
+      <button id="closeMenuBtn"><span>✕ Close menu</span><span class="hint"></span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DECK PICKER ============ -->
+<div class="overlay" id="deckOverlay" role="dialog" aria-modal="true" aria-label="Choose your card deck">
+  <div class="sheet">
+    <h2>Choose your deck</h2>
+    <p class="small muted">Tap a deck and every card on the table changes right away — your hand, the tricks, everything. You can switch any time, even mid-hand.</p>
+    <div class="deck-grid" id="deckGrid">
+      <button class="deck-option sel" data-deck-choice="classic">
+        <span class="deck-preview" aria-hidden="true">
+          <span class="pv-card"><span class="r">A</span><span class="s">♠</span><span class="big">♠</span></span>
+          <span class="pv-card red"><span class="r">K</span><span class="s">♥</span><span class="big">♥</span></span>
+        </span>
+        <span class="deck-meta"><span class="deck-name">Classic</span><span class="deck-desc">The standard deck — clean white cards, traditional faces.</span></span>
+        <span class="deck-check" aria-hidden="true">✓</span>
+      </button>
+      <button class="deck-option" data-deck-choice="ornate">
+        <span class="deck-preview" aria-hidden="true">
+          <span class="pv-card pv-ornate"><span class="r">A</span><span class="s">♠</span><span class="big">♠</span></span>
+          <span class="pv-card pv-ornate red"><span class="r">K</span><span class="s">♥</span><span class="big">♥</span></span>
+        </span>
+        <span class="deck-meta"><span class="deck-name">Ornate Gold</span><span class="deck-desc">Fancy casino style — cream parchment, gold double-rule trim and flourishes.</span></span>
+        <span class="deck-check" aria-hidden="true">✓</span>
+      </button>
+      <button class="deck-option" data-deck-choice="plain">
+        <span class="deck-preview" aria-hidden="true">
+          <span class="pv-card pv-plain"><span class="r">A</span><span class="s">♠</span><span class="big">♠</span></span>
+          <span class="pv-card pv-plain red"><span class="r">K</span><span class="s">♥</span><span class="big">♥</span></span>
+        </span>
+        <span class="deck-meta"><span class="deck-name">Plain</span><span class="deck-desc">No frills at all — flat white cards, simple type, easy on the eyes.</span></span>
+        <span class="deck-check" aria-hidden="true">✓</span>
+      </button>
+      <button class="deck-option" data-deck-choice="midnight">
+        <span class="deck-preview" aria-hidden="true">
+          <span class="pv-card pv-midnight"><span class="r">A</span><span class="s">♠</span><span class="big">♠</span></span>
+          <span class="pv-card pv-midnight red"><span class="r">K</span><span class="s">♥</span><span class="big">♥</span></span>
+        </span>
+        <span class="deck-meta"><span class="deck-name">Midnight</span><span class="deck-desc">Dark navy cards with pale ink — moody, sleek, great in a dim room.</span></span>
+        <span class="deck-check" aria-hidden="true">✓</span>
+      </button>
+    </div>
+    <button class="ghost-btn" id="closeDeckBtn">Done</button>
+  </div>
+</div>
+
+<!-- ============ BIDDING ============ -->
+<div class="overlay" id="bidOverlay" role="dialog" aria-modal="true" aria-label="Place your bid">
+  <div class="sheet">
+    <h2>Your bid</h2>
+    <p class="small muted" id="bidContext">How many tricks will you take?</p>
+    <div class="bid-grid" id="bidGrid"></div>
+    <p class="small muted"><b>Nil (0)</b> is a promise to take no tricks at all: +10 points if you pull it off, −10 if you take even one. In a 4-player game your bid adds to your partner's — the team has to make the combined total.</p>
+  </div>
+</div>
+
+<!-- ============ HAND RESULT / GAME OVER ============ -->
+<div class="overlay" id="resultOverlay" role="dialog" aria-modal="true" aria-label="Hand result">
+  <div class="sheet">
+    <h2 id="resultTitle">Hand over</h2>
+    <div id="resultBody"></div>
+    <button class="big-btn" id="resultBtn">Next deal</button>
+    <button class="ghost-btn" id="resultRestartBtn">↻ Restart game from scratch</button>
+  </div>
+</div>
+
+<!-- ============ HOW TO PLAY ============ -->
+<div class="overlay" id="howOverlay" role="dialog" aria-modal="true" aria-label="How to play">
+  <div class="sheet">
+    <h2>How to play</h2>
+    <ul class="rules">
+      <li><b>Goal:</b> be the first player (or team) to <b>35 points</b>.</li>
+      <li><b>Deal:</b> the deck is shuffled fresh every deal. 4 players get 13 cards each; 3 players get 17 (the 2♣ sits out); 2 players get 13 each and the rest of the deck sits out.</li>
+      <li><b>Bidding:</b> everyone bids how many tricks they'll take. In 4-player games, partners' bids and tricks combine.</li>
+      <li><b>Play:</b> follow the suit led if you can. Highest card of the led suit wins — unless a spade is played. <b>Spades are trump.</b></li>
+      <li><b>House rule:</b> spades may be <b>led at any time</b>, right from the first trick. You don't have to wait for spades to be broken.</li>
+      <li><b>Scoring — pick before you start</b> (on the start screen or in Menu → Scoring). <b>First to 35 wins either way.</b></li>
+      <li><b>Bid = points:</b> make your bid and you score <b>exactly your bid</b> — bid 4, score 4. Extra tricks add nothing. Miss your bid and you <b>lose your bid</b>.</li>
+      <li><b>Standard:</b> make your bid and you score <b>2 points per trick bid + 1 per extra trick</b>. Miss your bid and you <b>lose 1 point per trick bid</b>.</li>
+      <li><b>Nil (bid 0):</b> take no tricks for <b>+10</b>; take any trick and it's <b>−10</b>. In partners, a nil is scored on its own, separate from your partner's bid.</li>
+      <li>The winner of each trick leads the next one. Dealer rotates every hand.</li>
+    </ul>
+    <button class="big-btn" id="closeHowBtn">Got it</button>
+  </div>
+</div>
+
+<!-- ============ INSTALL ============ -->
+<div class="overlay" id="installOverlay" role="dialog" aria-modal="true" aria-label="Install app">
+  <div class="sheet">
+    <h2>Install Spades on your phone</h2>
+    <div id="installBody"></div>
+    <button class="big-btn" id="installNowBtn" style="display:none">⬇ Install Spades</button>
+    <button class="ghost-btn" id="closeInstallBtn">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ================= Helpers ================= */
+var $ = function(id){ return document.getElementById(id); };
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function toast(msg){ var t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove('on'); },2600); }
+
+/* ================= Sound (tiny WebAudio ticks) ================= */
+var soundOn = true, actx = null;
+function beep(freq, dur, vol){
+  if(!soundOn) return;
+  try{
+    if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended') actx.resume();
+    var o=actx.createOscillator(), g=actx.createGain();
+    o.frequency.value=freq; o.type='triangle';
+    g.gain.setValueAtTime(vol||0.06, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+(dur||0.07));
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime+(dur||0.07));
+  }catch(e){}
+}
+function sndPlay(){ beep(520,0.06,0.05); }
+function sndWin(){ beep(740,0.09,0.06); setTimeout(function(){ beep(980,0.1,0.05); },90); }
+function sndBad(){ beep(180,0.12,0.06); }
+
+/* ================= Wake Lock — keep the screen awake while the game is open =================
+   Uses the Screen Wake Lock API. The browser can drop the lock on its own
+   (tab hidden, battery saver, system timeout), so we re-acquire it:
+   on visibility return, on any tap/click/keypress (user activation helps
+   the request succeed), when the system releases it, and on a periodic
+   check. The lock is wanted for the whole time the page is open — at the
+   start screen and while playing — not only after the first deal. */
+var wakeLock = null, gameActive = false, wakeDesired = true, wakeRequesting = false, wakeRetryTimer = null;
+function updateWakeUI(){
+  var on = !!wakeLock;
+  var supported = ('wakeLock' in navigator);
+  $('wakeDot').className = 'wake-dot' + (on ? ' on' : '');
+  $('wakeTxt').textContent = on ? 'Screen: kept awake' : (supported ? 'Screen: keeping awake…' : 'Screen: normal');
+  $('wakeChip').title = on ? 'Screen wake lock is on — the screen will not dim while Spades is open' : 'Tap to keep the screen awake while Spades is open';
+}
+function scheduleWakeRetry(){
+  if(!wakeDesired || wakeRetryTimer) return;
+  wakeRetryTimer = setTimeout(function(){
+    wakeRetryTimer = null;
+    if(wakeDesired && document.visibilityState === 'visible') requestWake();
+  }, 1200);
+}
+async function requestWake(){
+  if(!wakeDesired) return;
+  if(!('wakeLock' in navigator)) { updateWakeUI(); return; }
+  if(wakeLock || wakeRequesting) { updateWakeUI(); return; }
+  if(document.visibilityState !== 'visible') return;
+  wakeRequesting = true;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    if(wakeLock){
+      wakeLock.addEventListener('release', function(){
+        wakeLock = null; updateWakeUI();
+        /* System took the lock back while the game is still open — get it again. */
+        scheduleWakeRetry();
+      });
+    }
+  }catch(e){ wakeLock = null; /* denied (e.g. no user activation yet, battery saver) — the tap listeners and the 20s check will try again */ }
+  wakeRequesting = false;
+  updateWakeUI();
+}
+function releaseWake(){
+  if(wakeLock){ var wl = wakeLock; wakeLock = null; try{ wl.release(); }catch(e){} }
+  updateWakeUI();
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && wakeDesired) requestWake();
+});
+window.addEventListener('pagehide', function(){ releaseWake(); });
+window.addEventListener('pageshow', function(){ if(wakeDesired) requestWake(); });
+/* Any interaction is a fresh chance to acquire the lock (some browsers
+   only grant it while the page has user activation). */
+['pointerdown','click','touchend','keydown'].forEach(function(evt){
+  document.addEventListener(evt, function(){ if(wakeDesired && !wakeLock) requestWake(); }, { passive:true });
+});
+/* Periodic safety net while the page stays open. */
+setInterval(function(){
+  if(wakeDesired && document.visibilityState === 'visible' && !wakeLock) requestWake();
+}, 20000);
+function setGameActive(on){
+  gameActive = on;
+  /* The screen stays awake for as long as the game is open, including
+     the start screen — going back to setup does not release the lock.
+     It is only released when the page itself is hidden or closed. */
+  wakeDesired = true;
+  if(wakeDesired) requestWake();
+  updateWakeUI();
+}
+/* Try immediately on open, and again once the page has fully loaded. */
+requestWake();
+window.addEventListener('load', function(){ requestWake(); });
+
+/* ================= Install (PWA) ================= */
+var bipEvent = null;
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); bipEvent = e; });
+window.addEventListener('appinstalled', function(){ bipEvent = null; toast('Spades installed — find it on your home screen ♠'); closeAll(); });
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    /* Ask for the widest scope the host allows, so the worker can actually
+       control the game page — a worker registered from assets/ is otherwise
+       limited to that folder and can never manage the page itself, which
+       breaks the installed app. Where the host doesn't allow the wider
+       scope, fall back to the plain registration; Add to Home Screen
+       still works either way. */
+    navigator.serviceWorker.register('sw.js', {scope:'./'}).catch(function(){
+      navigator.serviceWorker.register('data:application/javascript;base64,LyogU3BhZGVzIHNlcnZpY2Ugd29ya2VyIOKAlCBjYWNoZXMgdGhlIGdhbWUgc28gdGhlIGluc3RhbGxlZCBhcHAgd29ya3Mgb2ZmbGluZS4KICAgTmV0d29yay1maXJzdCBmb3IgdGhlIHBhZ2Ugc28gdXBkYXRlcyBhcnJpdmUsIGNhY2hlLWZpcnN0IGZvciBpY29ucy4gKi8KdmFyIENBQ0hFID0gJ3NwYWRlcy12Mic7CnZhciBDT1JFID0gWycuLycsICcuLi9pbmRleC5odG1sJywgJ2ljb24tMTkyLnBuZycsICdpY29uLTUxMi5wbmcnLCAnbWFuaWZlc3Qud2VibWFuaWZlc3QnXTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZnVuY3Rpb24gKGUpIHsKICBlLndhaXRVbnRpbChjYWNoZXMub3BlbihDQUNIRSkudGhlbihmdW5jdGlvbiAoYykgeyByZXR1cm4gYy5hZGRBbGwoQ09SRSkuY2F0Y2goZnVuY3Rpb24oKXt9KTsgfSkudGhlbihmdW5jdGlvbigpeyByZXR1cm4gc2VsZi5za2lwV2FpdGluZygpOyB9KSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2FjdGl2YXRlJywgZnVuY3Rpb24gKGUpIHsKICBlLndhaXRVbnRpbChjYWNoZXMua2V5cygpLnRoZW4oZnVuY3Rpb24gKGtleXMpIHsKICAgIHJldHVybiBQcm9taXNlLmFsbChrZXlzLm1hcChmdW5jdGlvbiAoaykgeyByZXR1cm4gayAhPT0gQ0FDSEUgPyBjYWNoZXMuZGVsZXRlKGspIDogbnVsbDsgfSkpOwogIH0pLnRoZW4oZnVuY3Rpb24oKXsgcmV0dXJuIHNlbGYuY2xpZW50cy5jbGFpbSgpOyB9KSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2ZldGNoJywgZnVuY3Rpb24gKGUpIHsKICBpZiAoZS5yZXF1ZXN0Lm1ldGhvZCAhPT0gJ0dFVCcpIHJldHVybjsKICBlLnJlc3BvbmRXaXRoKAogICAgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0LCB7IGlnbm9yZVNlYXJjaDogdHJ1ZSB9KTsgfSkKICApOwp9KTsK').catch(function(){});
+    });
+  });
+}
+function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+function openInstall(){
+  var body = $('installBody'), nowBtn = $('installNowBtn');
+  closeAll(); $('installOverlay').classList.add('on');
+  if(isStandalone()){
+    body.innerHTML = '<p>You\'re already playing the installed app — Spades is on your home screen. 🎉</p>';
+    nowBtn.style.display = 'none'; return;
+  }
+  if(bipEvent){
+    body.innerHTML = '<p>Install Spades as an app: it gets its own ♠ icon on your home screen, opens full-screen, and works offline.</p>';
+    nowBtn.style.display = 'block'; return;
+  }
+  nowBtn.style.display = 'none';
+  if(window.self !== window.top){
+    body.innerHTML = '<p><b>You\'re viewing Spades inside another app\'s window.</b> Installing from here would save that app\'s page, not the game. Open the Spades link directly in your phone\'s browser (Chrome on Android, Safari on iPhone) and install from there — the ♠ icon will then launch Spades itself.</p>';
+    return;
+  }
+  var ua = navigator.userAgent || '';
+  if(/iphone|ipad|ipod/i.test(ua)){
+    body.innerHTML = '<p><b>On iPhone / iPad (Safari):</b></p><ol class="rules"><li>Tap the <b>Share</b> button (the square with an arrow pointing up) at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b> — the ♠ Spades icon lands on your home screen and launches the game like an app.</li></ol>';
+  } else if(/android/i.test(ua)){
+    body.innerHTML = '<p><b>On Android (Chrome):</b></p><ol class="rules"><li>Tap the <b>⋮ menu</b> at the top-right of Chrome.</li><li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li><li>Tap <b>Install</b> — the ♠ Spades icon lands on your home screen and launches the game like an app, even offline.</li></ol><p class="small muted">If an install prompt pops up on its own while you play, that works too.</p>';
+  } else {
+    body.innerHTML = '<p><b>On a computer (Chrome / Edge):</b> click the install icon in the address bar, or open the browser menu and choose <b>Install Spades</b>.</p><p><b>On a phone:</b> open this page in Chrome (Android) and tap ⋮ → <b>Install app</b>, or in Safari (iPhone) tap Share → <b>Add to Home Screen</b>. The ♠ icon then launches the game straight from your home screen.</p>';
+  }
+}
+$('installNowBtn').addEventListener('click', async function(){
+  if(!bipEvent){ openInstall(); return; }
+  bipEvent['prompt']();
+  try{ await bipEvent.userChoice; }catch(e){}
+  bipEvent = null; closeAll();
+});
+</script>
+<script>
+'use strict';
+/* ================= Cards & state ================= */
+var SUITS=[
+  {id:'c',sym:'♣',name:'Clubs',red:false},
+  {id:'d',sym:'♦',name:'Diamonds',red:true},
+  {id:'h',sym:'♥',name:'Hearts',red:true},
+  {id:'s',sym:'♠',name:'Spades',red:false}
+];
+function rankLabel(r){ return r===14?'A':r===13?'K':r===12?'Q':r===11?'J':String(r); }
+function suitOf(c){ for(var i=0;i<SUITS.length;i++) if(SUITS[i].id===c.suit) return SUITS[i]; return SUITS[0]; }
+
+var AI_NAMES={2:['Ruby'],3:['Ruby','Mack'],4:['Wanda','Nate','Earl']};
+var EXPLAINS={
+  2:'2 players: 13 cards each, every player for themselves. The other 26 cards sit out the hand.',
+  3:'3 players: 17 cards each (the 2♣ sits out), every player for themselves.',
+  4:'4 players: 13 cards each. You and Nate (North) are a team — your bids and tricks combine.'
+};
+var G=null, epoch=0, selectedCount=4, selectedScoring='bid';
+var SCORING_NAMES={bid:'Bid = points', standard:'Standard'};
+var SCORING_EXPLAINS={
+  bid:'Bid = points: bid 4 and make it, you score 4 — overtricks add nothing. Miss your bid and you lose your bid (−4). Nil still pays +10 / −10. First to 35 still wins.',
+  standard:'Standard: make your bid for 2 points per trick bid + 1 per extra trick (bid 4, take 5 → 9 points). Miss your bid and you lose your bid. Nil still pays +10 / −10. First to 35 wins.'
+};
+function scoringMode(){ return G && G.scoringMode ? G.scoringMode : selectedScoring; }
+function setScoringMode(mode, silent){
+  if(!SCORING_NAMES[mode]) mode='bid';
+  selectedScoring=mode;
+  if(G) G.scoringMode=mode;
+  document.querySelectorAll('#scoreSeg button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-mode')===mode); });
+  var ex=$('scoreExplain'); if(ex) ex.textContent=SCORING_EXPLAINS[mode];
+  var hint=$('scoreModeHint'); if(hint) hint.textContent=SCORING_NAMES[mode]+' · first to 35';
+  if(!silent) toast('Scoring: '+SCORING_NAMES[mode]+' — first to 35 ♠');
+}
+
+function entities(){
+  if(!G) return [];
+  if(G.count===4) return [
+    {name:'You + Nate', members:[0,2], score:G.teamScores[0]},
+    {name:'Wanda + Earl', members:[1,3], score:G.teamScores[1]}
+  ];
+  return G.players.map(function(p,i){ return {name:p.name, members:[i], score:p.score}; });
+}
+function entityScoreOf(playerIdx){
+  if(G.count===4) return G.teamScores[playerIdx%2===0?0:1];
+  return G.players[playerIdx].score;
+}
+function addEntityScore(playerIdx, delta){
+  if(G.count===4){ G.teamScores[playerIdx%2===0?0:1]+=delta; }
+  else G.players[playerIdx].score+=delta;
+}
+
+/* ================= Setup / flow ================= */
+function startGame(count){
+  epoch++;
+  G={
+    count:count, players:[], dealer:count-1, teamScores:[0,0],
+    phase:'idle', trick:[], current:-1, leader:-1, trickNo:1,
+    cardsPer: count===3?17:13, handNo:0, over:false, scoringMode:selectedScoring
+  };
+  var names=['You'].concat(AI_NAMES[count]);
+  for(var i=0;i<count;i++) G.players.push({name:names[i], human:i===0, hand:[], bid:null, tricks:0, score:0});
+  setGameActive(true);
+  $('startScreen').classList.remove('on');
+  $('gameScreen').classList.add('on');
+  closeAll();
+  newDeal();
+  toast('New game — '+SCORING_NAMES[selectedScoring]+', first to 35. Good luck ♠');
+}
+function backToStart(){
+  epoch++; G=null; setGameActive(false); closeAll();
+  $('gameScreen').classList.remove('on');
+  $('startScreen').classList.add('on');
+  renderScores();
+}
+function newDeal(){
+  if(!G) return;
+  var myEpoch=epoch;
+  G.handNo++;
+  G.dealer=(G.dealer+1)%G.count;
+  var deck=[];
+  SUITS.forEach(function(s){ for(var r=2;r<=14;r++) deck.push({suit:s.id, rank:r}); });
+  if(G.count===3) deck=deck.filter(function(c){ return !(c.suit==='c'&&c.rank===2); });
+  shuffle(deck); /* fresh shuffle every deal */
+  G.players.forEach(function(p){ p.hand=[]; p.bid=null; p.tricks=0; });
+  var n=G.count===2?26:deck.length;
+  for(var i=0;i<n;i++) G.players[i%G.count].hand.push(deck[i]);
+  G.players.forEach(function(p){ sortHand(p.hand); });
+  G.trick=[]; G.trickNo=1; G.phase='bidding';
+  G.bidQueue=[];
+  var start=(G.dealer+1)%G.count;
+  for(var k=0;k<G.count;k++) G.bidQueue.push((start+k)%G.count);
+  /* Point "current" at the first bidder right away — otherwise the turn
+     highlight sits on whoever acted last in the previous hand until the
+     first bid is taken, naming the wrong player. */
+  G.current=G.bidQueue[0];
+  renderAll();
+  setMsg('Hand '+G.handNo+' — <b>'+G.players[G.dealer].name+'</b> dealt. Bidding… (fresh shuffle, as always)');
+  setTimeout(function(){ if(myEpoch===epoch) nextBid(); },650);
+}
+function sortHand(h){
+  var order={c:0,d:1,h:2,s:3};
+  h.sort(function(a,b){ return order[a.suit]-order[b.suit] || b.rank-a.rank; });
+}
+function nextBid(){
+  if(!G||G.phase!=='bidding') return;
+  if(G.bidQueue.length===0){
+    G.phase='playing';
+    G.leader=(G.dealer+1)%G.count; G.current=G.leader;
+    renderAll();
+    setMsg('Bidding done. <b>'+G.players[G.leader].name+'</b> leads the first trick — spades are fair game from the start.');
+    scheduleAI();
+    return;
+  }
+  var idx=G.bidQueue.shift(); G.current=idx; renderAll();
+  if(G.players[idx].human){
+    $('bidContext').textContent='Hand '+G.handNo+' · You have '+G.players[0].hand.length+' cards. '+(G.count===4?'Your partner Nate bids too — your bids combine. ':'')+'How many tricks will you take?';
+    var grid=$('bidGrid'); grid.innerHTML='';
+    for(var b=0;b<=G.cardsPer;b++){
+      (function(bid){
+        var btn=document.createElement('button');
+        btn.textContent=bid===0?'Nil':String(bid);
+        if(bid===0) btn.className='nil';
+        btn.setAttribute('aria-label', bid===0?'Bid Nil (zero tricks)':'Bid '+bid);
+        btn.addEventListener('click',function(){
+          G.players[0].bid=bid; beep(660,0.06,0.05);
+          $('bidOverlay').classList.remove('on');
+          renderAll(); nextBid();
+        });
+        grid.appendChild(btn);
+      })(b);
+    }
+    $('bidOverlay').classList.add('on');
+  } else {
+    var myEpoch=epoch;
+    setTimeout(function(){
+      if(myEpoch!==epoch||!G) return;
+      G.players[idx].bid=aiBid(G.players[idx]);
+      setMsg('<b>'+G.players[idx].name+'</b> bids '+(G.players[idx].bid===0?'<b>Nil</b>':'<b>'+G.players[idx].bid+'</b>')+'.');
+      renderAll(); nextBid();
+    }, 620);
+  }
+}
+
+/* ================= AI ================= */
+function aiBid(p){
+  var est=0, bySuit={c:[],d:[],h:[],s:[]};
+  p.hand.forEach(function(c){ bySuit[c.suit].push(c); });
+  Object.keys(bySuit).forEach(function(s){
+    var cards=bySuit[s], has=function(r){ return cards.some(function(c){return c.rank===r;}); };
+    if(has(14)) est+=1;
+    if(has(13)) est+= cards.length>=2?0.8:0.3;
+    if(has(12)) est+= (s==='s')?0.5:(cards.length>=3?0.35:0.1);
+    if(s!=='s'){ if(cards.length===0) est+=0.5; else if(cards.length===1) est+=0.25; }
+  });
+  var sp=bySuit.s.length;
+  if(sp>3) est+=(sp-3)*0.4;
+  var bid=Math.round(est);
+  var hasAceOrKing=p.hand.some(function(c){return c.rank>=13;});
+  if(bid<=0){ return (!hasAceOrKing && sp<=1) ? 0 : 1; }
+  return Math.max(1, Math.min(bid, G.cardsPer-2));
+}
+function trickWinnerIdx(trick){
+  var led=trick[0].card.suit, best=0, bestScore=-1;
+  trick.forEach(function(t,i){
+    var sc = t.card.suit==='s' ? 100+t.card.rank : (t.card.suit===led ? t.card.rank : 0);
+    if(sc>bestScore){ bestScore=sc; best=i; }
+  });
+  return best;
+}
+function aiPick(pIdx){
+  var p=G.players[pIdx], hand=p.hand.slice();
+  var partnerIdx = G.count===4 ? (pIdx+2)%4 : -1;
+  var isNil = p.bid===0;
+  var low=function(arr){ return arr.slice().sort(function(a,b){return a.rank-b.rank;})[0]; };
+  var high=function(arr){ return arr.slice().sort(function(a,b){return b.rank-a.rank;})[0]; };
+  if(G.trick.length===0){
+    if(isNil) return high(hand.filter(function(c){return c.suit!=='s';}).concat(hand).slice(0,1)) && low(hand);
+    var bySuit={c:[],d:[],h:[],s:[]};
+    hand.forEach(function(c){ bySuit[c.suit].push(c); });
+    var bestSuit=null,bestLen=-1;
+    ['c','d','h'].forEach(function(s){ if(bySuit[s].length>bestLen){bestLen=bySuit[s].length;bestSuit=s;} });
+    if(bestSuit && bySuit[bestSuit].length) return low(bySuit[bestSuit]);
+    return low(hand);
+  }
+  var led=G.trick[0].card.suit;
+  var follow=hand.filter(function(c){return c.suit===led;});
+  var winPos=trickWinnerIdx(G.trick), winner=G.trick[winPos];
+  var partnerWinning = partnerIdx>=0 && winner.p===partnerIdx;
+  var selfWinning = winner.p===pIdx;
+  if(isNil){
+    if(follow.length){
+      var ducks=follow.filter(function(c){ return !(winner.card.suit===led && c.rank>winner.card.rank) && winner.card.suit!=='s'; });
+      return ducks.length? high(ducks) : low(follow);
+    }
+    var nonSpade=hand.filter(function(c){return c.suit!=='s';});
+    return nonSpade.length? high(nonSpade) : low(hand);
+  }
+  if(follow.length){
+    if(partnerWinning||selfWinning) return low(follow);
+    if(winner.card.suit===led){
+      var beaters=follow.filter(function(c){return c.rank>winner.card.rank;});
+      if(beaters.length) return low(beaters);
+    }
+    return low(follow);
+  }
+  /* cannot follow suit */
+  var nonSpade=hand.filter(function(c){return c.suit!=='s';});
+  if(partnerWinning) return nonSpade.length? low(nonSpade) : low(hand);
+  var spades=hand.filter(function(c){return c.suit==='s';});
+  if(spades.length){
+    if(winner.card.suit==='s'){
+      var beaters2=spades.filter(function(c){return c.rank>winner.card.rank;});
+      if(beaters2.length) return low(beaters2);
+    } else return low(spades);
+  }
+  return low(hand);
+}
+function scheduleAI(){
+  if(!G||G.phase!=='playing') return;
+  if(G.players[G.current].human) { renderAll(); return; }
+  var myEpoch=epoch, idx=G.current;
+  setTimeout(function(){
+    if(myEpoch!==epoch||!G||G.phase!=='playing'||G.current!==idx) return;
+    playCard(idx, aiPick(idx));
+  }, 780);
+}
+function legalCards(pIdx){
+  var p=G.players[pIdx];
+  if(G.trick.length===0) return p.hand.slice();
+  var led=G.trick[0].card.suit;
+  var follow=p.hand.filter(function(c){return c.suit===led;});
+  return follow.length? follow : p.hand.slice();
+}
+function playCard(pIdx, card){
+  var p=G.players[pIdx];
+  var hi=p.hand.findIndex(function(c){return c.suit===card.suit&&c.rank===card.rank;});
+  if(hi<0) return;
+  p.hand.splice(hi,1);
+  G.trick.push({p:pIdx, card:card});
+  if(pIdx===0) sndPlay();
+  if(G.trick.length===1){
+    /* A lead card starts a new trick: replace the previous trick's
+       announcement right away, so it never lingers over this trick. */
+    setMsg(pIdx===0 ? 'You lead trick '+G.trickNo+'.' : '<b>'+G.players[pIdx].name+'</b> leads trick '+G.trickNo+'.');
+  }
+  if(G.trick.length===G.count){
+    /* Announce the winner NOW, while the finished trick is still on the
+       table and the winning card is highlighted — not when the trick
+       clears — so the announcement belongs to the trick it describes
+       and is gone before the next lead card lands. */
+    var wNow=G.trick[trickWinnerIdx(G.trick)].p;
+    G.phase='trickEnd';
+    if(wNow===0) sndWin();
+    setMsg('<b>'+G.players[wNow].name+'</b> takes trick '+G.trickNo+'.');
+    renderAll();
+    var myEpoch=epoch;
+    setTimeout(function(){
+      if(myEpoch!==epoch||!G) return;
+      var w=G.trick[trickWinnerIdx(G.trick)].p;
+      G.players[w].tricks++;
+      G.trick=[]; G.trickNo++; G.leader=w; G.current=w; G.phase='playing';
+      renderAll();
+      if(G.players[0].hand.length===0){ endHand(); return; }
+      setMsg(w===0 ? 'You took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+G.players[w].name+'</b> leads trick '+G.trickNo+'.');
+      scheduleAI();
+    }, 1250);
+  } else {
+    G.current=(pIdx+1)%G.count;
+    renderAll(); scheduleAI();
+  }
+}
+function endHand(){
+  G.phase='scoring';
+  var rows=[], gameWinner=null;
+  var ents=entities();
+  ents.forEach(function(ent){
+    var nilNotes=[], B=0, T=0, hasBid=false;
+    ent.members.forEach(function(mi){
+      var p=G.players[mi];
+      if(p.bid===0){
+        var nilDelta = p.tricks===0 ? 10 : -10;
+        addEntityScore(mi, nilDelta);
+        nilNotes.push(p.name+' Nil '+(p.tricks===0?'made +10':'failed −10'));
+      } else { B+=p.bid; T+=p.tricks; hasBid=true; }
+    });
+    var delta=0, note=nilNotes.join(' · ');
+    if(hasBid){
+      if(scoringMode()==='bid'){
+        if(T>=B){ delta=B; note=('Bid '+B+', took '+T+' → +'+delta+' (bid = points)')+(note?' · '+note:''); }
+        else { delta=-B; note=('Bid '+B+', took only '+T+' → −'+B)+(note?' · '+note:''); }
+      } else if(T>=B){ delta=2*B+(T-B); note=('Bid '+B+', took '+T+' → +'+delta)+(note?' · '+note:''); }
+      else { delta=-B; note=('Bid '+B+', took only '+T+' → −'+B)+(note?' · '+note:''); }
+      ent.members.forEach(function(mi){ addEntityScore(mi, 0); });
+      /* add combined delta once via first member's entity */
+      addEntityScore(ent.members[0], delta);
+    }
+    rows.push({name:ent.name, note:note, total:entityScoreOf(ent.members[0])});
+  });
+  ents.forEach(function(ent){ if(entityScoreOf(ent.members[0])>=35) gameWinner=ent; });
+  if(gameWinner){
+    var best=-Infinity;
+    ents.forEach(function(ent){ var s=entityScoreOf(ent.members[0]); if(s>best){best=s; gameWinner=ent;} });
+    G.over=true;
+  }
+  renderScores();
+  var html='<table class="score-table"><tr><th>Player / team</th><th>Hand result</th><th>Total</th></tr>';
+  rows.forEach(function(r){ html+='<tr><td>'+r.name+'</td><td style="text-align:right">'+r.note+'</td><td><b>'+r.total+'</b></td></tr>'; });
+  html+='</table>';
+  if(G.over){
+    $('resultTitle').textContent='🏆 '+gameWinner.name+' win'+(gameWinner.members.length>1?'':'s')+' the game!';
+    html+='<p><b>'+gameWinner.name+'</b> reached '+entityScoreOf(gameWinner.members[0])+' points — first to 35 takes it. Nice game!</p>';
+    $('resultBtn').textContent='Play again — fresh game';
+    sndWin();
+  } else {
+    $('resultTitle').textContent='Hand '+G.handNo+' — scores';
+    html+='<p class="small muted">Scoring: '+SCORING_NAMES[scoringMode()]+' · First to 35 wins. Next hand gets a brand-new shuffle.</p>';
+    $('resultBtn').textContent='Next deal';
+  }
+  $('resultBody').innerHTML=html;
+  $('resultOverlay').classList.add('on');
+  renderAll();
+}
+
+/* ================= Rendering ================= */
+function setMsg(html){ $('msg').innerHTML=html; }
+function cardEl(card, opts){
+  opts=opts||{};
+  var s=suitOf(card);
+  var el=document.createElement(opts.button?'button':'div');
+  el.className='card'+(s.red?' red':'')+(opts.mini?' mini':'')+(opts.winning?' winning':'');
+  el.innerHTML='<span class="r">'+rankLabel(card.rank)+'</span><span class="s">'+s.sym+'</span><span class="big">'+s.sym+'</span>';
+  el.setAttribute('aria-label', rankLabel(card.rank)+' of '+s.name);
+  return el;
+}
+function renderScores(){
+  var strip=$('scoreStrip');
+  if(!G){ strip.innerHTML=''; return; }
+  var ents=entities();
+  strip.innerHTML='';
+  ents.forEach(function(ent){
+    var bids=ent.members.map(function(mi){ var b=G.players[mi].bid; return b===null?'–':(b===0?'Nil':b); }).join(' + ');
+    var tricks=ent.members.reduce(function(a,mi){return a+G.players[mi].tricks;},0);
+    var div=document.createElement('div');
+    div.className='score-card'+(ent.members.indexOf(0)>=0?' me':'');
+    div.innerHTML='<div class="who">'+ent.name+'</div><div class="pts">'+ent.score+' <span style="font-size:13px" class="muted">/ 35</span></div><div class="sub">Bid '+bids+' · Tricks '+tricks+'</div><div class="progress"><i style="width:'+Math.max(0,Math.min(100,ent.score/35*100))+'%"></i></div>';
+    strip.appendChild(div);
+  });
+  $('menuState').textContent='Hand '+G.handNo+' · Scoring: '+SCORING_NAMES[scoringMode()]+' · '+(G.over?'Game over.':'Game in progress — scores above.');
+}
+function renderAll(){
+  if(!G) return;
+  renderScores();
+  /* opponents */
+  var opps=$('opponents'); opps.innerHTML='';
+  for(var i=1;i<G.count;i++){
+    (function(i){
+      var p=G.players[i];
+      var div=document.createElement('div');
+      div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'');
+      div.innerHTML='<div class="nm">'+p.name+(G.count===4&&i===2?' 🤝':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+'</div>';
+      opps.appendChild(div);
+    })(i);
+  }
+  /* trick area */
+  var ta=$('trickArea'); ta.innerHTML='';
+  if(G.trick.length===0){
+    ta.innerHTML='<div class="trick-empty">'+(G.phase==='bidding'?'Bidding…':'Waiting for the lead card. Spades can lead — no need to break them first.')+'</div>';
+  } else {
+    var winPos=trickWinnerIdx(G.trick);
+    G.trick.forEach(function(t,i){
+      var slot=document.createElement('div'); slot.className='trick-slot';
+      slot.appendChild(cardEl(t.card,{mini:true, winning: G.phase==='trickEnd'&&i===winPos}));
+      var who=document.createElement('div'); who.className='who'; who.textContent=G.players[t.p].name;
+      slot.appendChild(who); ta.appendChild(slot);
+    });
+  }
+  /* hand */
+  var handEl=$('hand'); handEl.innerHTML='';
+  var myTurn = G.phase==='playing' && G.current===0;
+  var legal = myTurn ? legalCards(0) : [];
+  var isLegal=function(c){ return legal.some(function(x){return x.suit===c.suit&&x.rank===c.rank;}); };
+  G.players[0].hand.forEach(function(c){
+    var b=cardEl(c,{button:true});
+    if(myTurn){
+      if(isLegal(c)){ b.classList.add('playable'); b.addEventListener('click',function(){ playCard(0,c); }); }
+      else b.classList.add('dim');
+    }
+    handEl.appendChild(b);
+  });
+  $('handInfo').textContent='Your hand — Bid: '+(G.players[0].bid===null?'…':(G.players[0].bid===0?'Nil':G.players[0].bid))+' · Tricks won: '+G.players[0].tricks+(G.dealer===0?' · You dealt':'');
+  $('trickInfo').textContent = G.phase==='playing' ? ('Trick '+G.trickNo+' of '+G.cardsPer+(myTurn?' · YOUR TURN':' · waiting on '+G.players[G.current].name)) : (G.phase==='bidding'?'Bidding…':'');
+}
+
+/* ================= Overlays & menu wiring ================= */
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay'].forEach(function(id){ $(id).classList.remove('on'); }); }
+$('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
+$('closeMenuBtn').addEventListener('click',closeAll);
+$('restartBtn').addEventListener('click',function(){
+  var count=G?G.count:selectedCount;
+  closeAll(); startGame(count);
+  toast('Restarted — scores back to 0, fresh shuffle ♠');
+});
+$('setupBtn').addEventListener('click',function(){ backToStart(); toast('Pick your table size to start a new game.'); });
+$('resultRestartBtn').addEventListener('click',function(){ var c=G?G.count:selectedCount; closeAll(); startGame(c); });
+$('resultBtn').addEventListener('click',function(){
+  closeAll();
+  if(!G) return;
+  if(G.over){ startGame(G.count); return; }
+  G.dealer=G.dealer; /* dealer already advances in newDeal */
+  newDeal();
+});
+$('howBtn1').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
+$('howBtn2').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
+$('closeHowBtn').addEventListener('click',closeAll);
+$('installBtn1').addEventListener('click',openInstall);
+$('installBtn2').addEventListener('click',openInstall);
+$('closeInstallBtn').addEventListener('click',closeAll);
+$('soundBtn').addEventListener('click',function(){ soundOn=!soundOn; $('soundHint').textContent=soundOn?'on':'off'; if(soundOn) sndWin(); });
+/* ================= Deck styles ================= */
+var DECK_NAMES={classic:'Classic', ornate:'Ornate Gold', plain:'Plain', midnight:'Midnight'};
+var currentDeck='classic';
+function setDeck(name, silent){
+  if(!DECK_NAMES[name]) name='classic';
+  currentDeck=name;
+  document.body.setAttribute('data-deck', name);
+  $('deckHint').textContent=DECK_NAMES[name];
+  document.querySelectorAll('.deck-option').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-deck-choice')===name); });
+  if(!silent){ beep(700,0.06,0.05); toast('Deck changed — '+DECK_NAMES[name]+' ♠'); }
+}
+$('deckBtn').addEventListener('click',function(){ closeAll(); $('deckOverlay').classList.add('on'); });
+$('closeDeckBtn').addEventListener('click',closeAll);
+document.querySelectorAll('.deck-option').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    setDeck(btn.getAttribute('data-deck-choice'));
+    closeAll();
+    if(G) renderAll();
+  });
+});
+setDeck('classic', true);
+document.querySelectorAll('.overlay').forEach(function(ov){
+  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay') ov.classList.remove('on'); });
+});
+/* player count selector */
+document.querySelectorAll('#countSeg button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('#countSeg button').forEach(function(b){ b.classList.remove('sel'); });
+    btn.classList.add('sel');
+    selectedCount=parseInt(btn.getAttribute('data-n'),10);
+    $('countExplain').textContent=EXPLAINS[selectedCount];
+    beep(600,0.05,0.04);
+  });
+});
+/* scoring mode selector — on the start screen, before the game begins */
+document.querySelectorAll('#scoreSeg button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    setScoringMode(btn.getAttribute('data-mode'));
+    beep(600,0.05,0.04);
+  });
+});
+$('scoreModeBtn').addEventListener('click',function(){
+  /* Toggle between the two modes; applies to the current game from the next hand scored, and to the next new game. */
+  var next = scoringMode()==='bid' ? 'standard' : 'bid';
+  setScoringMode(next);
+  beep(600,0.05,0.04);
+  if(G) renderScores();
+});
+setScoringMode('bid', true);
+$('dealBtn').addEventListener('click',function(){ startGame(selectedCount); });
+updateWakeUI();
+renderScores();
+</script>
+</body>
+</html>
