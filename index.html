@@ -96,6 +96,10 @@ button{font-family:inherit;cursor:pointer}
 .msg b{color:var(--gold-soft)}
 .hand-label{display:flex;justify-content:space-between;align-items:baseline;font-family:Verdana,sans-serif;font-size:12.5px;color:var(--muted);margin:8px 2px 6px;flex-wrap:wrap;gap:6px}
 .hand{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;padding-bottom:6px}
+.review-bar{margin-top:14px;background:var(--panel);border:1px solid rgba(212,175,55,.5);border-radius:16px;padding:16px;box-shadow:var(--shadow);text-align:center}
+.review-bar[hidden]{display:none !important}
+.review-bar .review-title{font-size:19px;font-weight:bold;margin:0;line-height:1.3}
+.review-bar .review-sub{margin:8px auto 0;max-width:520px}
 
 /* ---------- Cards ---------- */
 .card{
@@ -229,7 +233,7 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
   <section class="screen on" id="startScreen">
     <div class="panel">
       <h2>Pick your table</h2>
-      <p class="muted">You play against the computer. The deck is shuffled fresh for every deal, and <b>spades can be led on any trick</b> — no need to wait for them to be broken.</p>
+      <p class="muted">You play against the computer. The deck is shuffled fresh for every deal, and <b>spades can be led on any trick</b> — no need to wait for them to be broken. After each deal you'll see your cards first and tap <b>Ready</b> when you want to bid — no rush.</p>
       <h3 style="margin:14px 0 2px">How many players?</h3>
       <div class="seg" id="countSeg" role="group" aria-label="Number of players">
         <button data-n="2"><span class="n">2</span>Heads-up</button>
@@ -257,6 +261,12 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
       <div class="msg" id="msg" aria-live="polite">Welcome to the table.</div>
       <div class="hand-label"><span id="handInfo">Your hand</span><span id="trickInfo"></span></div>
       <div class="hand" id="hand"></div>
+      <div class="review-bar" id="reviewBar" hidden>
+        <p class="review-title">👀 Your cards are dealt — take your time</p>
+        <p class="small muted review-sub" id="reviewSummary">Look over your hand below and plan your bid. Count your sure tricks, your spades, and your high cards — there's no timer.</p>
+        <button class="big-btn" id="readyBidBtn">Ready — make my bid →</button>
+        <p class="small muted" style="margin:9px 0 0">Bidding won't start until you tap Ready.</p>
+      </div>
     </div>
   </section>
 
@@ -351,6 +361,7 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
     <ul class="rules">
       <li><b>Goal:</b> be the first player (or team) to <b>35 points</b>.</li>
       <li><b>Deal:</b> the deck is shuffled fresh every deal. 4 players get 13 cards each; 3 players get 17 (the 2♣ sits out); 2 players get 13 each and the rest of the deck sits out.</li>
+      <li><b>Look first, then bid:</b> after each deal your cards stay on screen for as long as you need — no timer. When you're ready, tap <b>Ready — make my bid</b> and bidding starts.</li>
       <li><b>Bidding:</b> everyone bids how many tricks they'll take. In 4-player games, partners' bids and tricks combine.</li>
       <li><b>Play:</b> follow the suit led if you can. Highest card of the led suit wins — unless a spade is played. <b>Spades are trump.</b></li>
       <li><b>House rule:</b> spades may be <b>led at any time</b>, right from the first trick. You don't have to wait for spades to be broken.</li>
@@ -611,7 +622,7 @@ function newDeal(){
   var n=G.count===2?26:deck.length;
   for(var i=0;i<n;i++) G.players[i%G.count].hand.push(deck[i]);
   G.players.forEach(function(p){ sortHand(p.hand); });
-  G.trick=[]; G.trickNo=1; G.phase='bidding';
+  G.trick=[]; G.trickNo=1; G.phase='review';
   G.bidQueue=[];
   var start=(G.dealer+1)%G.count;
   for(var k=0;k<G.count;k++) G.bidQueue.push((start+k)%G.count);
@@ -620,12 +631,31 @@ function newDeal(){
      first bid is taken, naming the wrong player. */
   G.current=G.bidQueue[0];
   renderAll();
-  setMsg('Hand '+G.handNo+' — <b>'+G.players[G.dealer].name+'</b> dealt. Bidding… (fresh shuffle, as always)');
-  setTimeout(function(){ if(myEpoch===epoch) nextBid(); },650);
+  setMsg('Hand '+G.handNo+' — <b>'+G.players[G.dealer].name+'</b> dealt. <b>Look over your cards below</b>, then tap <b>Ready</b> when you want to bid.');
+  /* No bidding timer: the player reviews their hand for as long as they
+     like and taps Ready (see startBidding) to move on to bidding. */
 }
 function sortHand(h){
   var order={c:0,d:1,h:2,s:3};
   h.sort(function(a,b){ return order[a.suit]-order[b.suit] || b.rank-a.rank; });
+}
+function handSummaryText(){
+  if(!G||!G.players[0]) return '';
+  var hand=G.players[0].hand;
+  var counts={c:0,d:0,h:0,s:0};
+  var aces=0, kings=0;
+  hand.forEach(function(c){ counts[c.suit]++; if(c.rank===14) aces++; if(c.rank===13) kings++; });
+  return 'You have '+hand.length+' cards: '+counts.s+' ♠ spades · '+counts.h+' ♥ hearts · '+counts.d+' ♦ diamonds · '+counts.c+' ♣ clubs'
+    +(aces||kings ? ' · '+aces+' ace'+(aces===1?'':'s')+', '+kings+' king'+(kings===1?'':'s') : '')
+    +'. Take as long as you need, then tap Ready to bid.';
+}
+function startBidding(){
+  if(!G||G.phase!=='review') return;
+  G.phase='bidding';
+  beep(660,0.06,0.05);
+  renderAll();
+  setMsg('Hand '+G.handNo+' — bidding. <b>'+G.players[G.current].name+'</b> '+(G.current===0?'— that\'s you.':'bids first.'));
+  nextBid();
 }
 function nextBid(){
   if(!G||G.phase!=='bidding') return;
@@ -890,7 +920,7 @@ function renderAll(){
   /* trick area */
   var ta=$('trickArea'); ta.innerHTML='';
   if(G.trick.length===0){
-    ta.innerHTML='<div class="trick-empty">'+(G.phase==='bidding'?'Bidding…':'Waiting for the lead card. Spades can lead — no need to break them first.')+'</div>';
+    ta.innerHTML='<div class="trick-empty">'+(G.phase==='review'?'Your cards are dealt — look them over below, then tap Ready when you\'re set to bid.':(G.phase==='bidding'?'Bidding…':'Waiting for the lead card. Spades can lead — no need to break them first.'))+'</div>';
   } else {
     var winPos=trickWinnerIdx(G.trick);
     G.trick.forEach(function(t,i){
@@ -914,7 +944,15 @@ function renderAll(){
     handEl.appendChild(b);
   });
   $('handInfo').textContent='Your hand — Bid: '+(G.players[0].bid===null?'…':(G.players[0].bid===0?'Nil':G.players[0].bid))+' · Tricks won: '+G.players[0].tricks+(G.dealer===0?' · You dealt':'');
-  $('trickInfo').textContent = G.phase==='playing' ? ('Trick '+G.trickNo+' of '+G.cardsPer+(myTurn?' · YOUR TURN':' · waiting on '+G.players[G.current].name)) : (G.phase==='bidding'?'Bidding…':'');
+  $('trickInfo').textContent = G.phase==='playing' ? ('Trick '+G.trickNo+' of '+G.cardsPer+(myTurn?' · YOUR TURN':' · waiting on '+G.players[G.current].name)) : (G.phase==='bidding'?'Bidding…':(G.phase==='review'?'Review your hand — no rush':''));
+  /* Review step: show the Ready bar only while the player is looking
+     over a fresh hand, and fill in a quick count to help plan the bid. */
+  var rb=$('reviewBar');
+  if(rb){
+    var inReview = G.phase==='review';
+    rb.hidden = !inReview;
+    if(inReview) $('reviewSummary').textContent = handSummaryText();
+  }
 }
 
 /* ================= Overlays & menu wiring ================= */
@@ -992,6 +1030,7 @@ $('scoreModeBtn').addEventListener('click',function(){
 });
 setScoringMode('bid', true);
 $('dealBtn').addEventListener('click',function(){ startGame(selectedCount); });
+$('readyBidBtn').addEventListener('click',function(){ startBidding(); });
 updateWakeUI();
 renderScores();
 </script>
