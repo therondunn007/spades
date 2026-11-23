@@ -486,7 +486,12 @@ window.addEventListener('load', function(){ requestWake(); });
 
 /* ================= Install (PWA) ================= */
 var bipEvent = null;
-window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); bipEvent = e; });
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); bipEvent = e;
+  /* If the install sheet is already open (the browser offered its prompt a
+     moment late), refresh it so the real Install button appears. */
+  if($('installOverlay').classList.contains('on')) openInstall();
+});
 window.addEventListener('appinstalled', function(){ bipEvent = null; toast('Spades installed — find it on your home screen ♠'); closeAll(); });
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
@@ -502,36 +507,72 @@ if('serviceWorker' in navigator){
   });
 }
 function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
+function inAppWindow(){ try{ return window.self !== window.top; }catch(e){ return true; } }
+function isWebView(){ return /; wv\)/.test(navigator.userAgent || ''); }
+/* Fire the browser's own install prompt — the real installer — whenever the
+   browser has offered one (Chrome, Samsung Internet, Edge, …). Returns true
+   when a prompt was launched. If the player dismisses it, fall back to the
+   install sheet with that browser's manual steps. */
+function tryNativeInstall(){
+  if(!bipEvent) return false;
+  var ev = bipEvent; bipEvent = null;
+  try{ ev['prompt'](); }catch(e){ openInstall(); return true; }
+  if(ev.userChoice && typeof ev.userChoice.then === 'function'){
+    ev.userChoice.then(function(choice){
+      if(choice && choice.outcome === 'accepted'){ closeAll(); }
+      else { openInstall(); }
+    }, function(){ openInstall(); });
+  }
+  return true;
+}
+/* What tapping "Install app" does: the best thing the current browser
+   allows — its native installer when one is on offer, otherwise that
+   browser's own install steps. */
+function onInstallTap(){
+  if(tryNativeInstall()) return;
+  openInstall();
+}
 function openInstall(){
   var body = $('installBody'), nowBtn = $('installNowBtn');
   closeAll(); $('installOverlay').classList.add('on');
-  if(isStandalone()){
-    body.innerHTML = '<p>You\'re already playing the installed app — Spades is on your home screen. 🎉</p>';
-    nowBtn.style.display = 'none'; return;
-  }
   if(bipEvent){
-    body.innerHTML = '<p>Install Spades as an app: it gets its own ♠ icon on your home screen, opens full-screen, and works offline.</p>';
+    body.innerHTML = '<p>Install Spades as an app: it gets its own ♠ icon on your home screen, opens full-screen, and works offline. Tap the button below and your browser runs the installer.</p>';
     nowBtn.style.display = 'block'; return;
   }
   nowBtn.style.display = 'none';
-  if(window.self !== window.top){
-    body.innerHTML = '<p><b>You\'re viewing Spades inside another app\'s window.</b> Installing from here would save that app\'s page, not the game. Open the Spades link directly in your phone\'s browser (Chrome on Android, Safari on iPhone) and install from there — the ♠ icon will then launch Spades itself.</p>';
+  /* "Already installed" is only true when the game is genuinely running as
+     an installed app: standalone display mode at the top level. A page
+     shown inside another app's window can inherit that app's standalone
+     mode — an earlier install from a Muse link puts a Muse icon on the
+     home screen, not Spades — so that case must never be reported as
+     Spades being installed. */
+  if(isStandalone() && !inAppWindow()){
+    body.innerHTML = '<p>You\'re playing the installed Spades app right now — its ♠ icon is on your home screen (it\'s worth a look in the app drawer too). 🎉</p>';
     return;
   }
   var ua = navigator.userAgent || '';
+  if(inAppWindow() || isWebView()){
+    body.innerHTML = '<p><b>You\'re viewing Spades inside another app\'s window</b>, and that window can\'t install the game — anything it saved to your home screen would be that app, not Spades.</p><ol class="rules"><li>Tap the <b>⋮</b> or <b>•••</b> menu in this window and choose <b>Open in Chrome</b> / <b>Open in browser</b> (on iPhone, open the Spades link in <b>Safari</b> instead).</li><li>Once the game is open in the browser, tap <b>Install app</b> here again and the installer will run.</li></ol>';
+    return;
+  }
   if(/iphone|ipad|ipod/i.test(ua)){
-    body.innerHTML = '<p><b>On iPhone / iPad (Safari):</b></p><ol class="rules"><li>Tap the <b>Share</b> button (the square with an arrow pointing up) at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b> — the ♠ Spades icon lands on your home screen and launches the game like an app.</li></ol>';
+    if(/crios|fxios|edgios/i.test(ua)){
+      body.innerHTML = '<p><b>On iPhone / iPad:</b> this browser can\'t add apps to the home screen. Open the Spades link in <b>Safari</b>, then tap the <b>Share</b> button → <b>Add to Home Screen</b> → <b>Add</b> — the ♠ Spades icon lands on your home screen.</p>';
+    } else {
+      body.innerHTML = '<p><b>On iPhone / iPad (Safari):</b></p><ol class="rules"><li>Tap the <b>Share</b> button (the square with an arrow pointing up) at the bottom of Safari.</li><li>Scroll down and tap <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b> — the ♠ Spades icon lands on your home screen and launches the game like an app.</li></ol>';
+    }
+  } else if(/samsungbrowser/i.test(ua)){
+    body.innerHTML = '<p><b>On Android (Samsung Internet):</b></p><ol class="rules"><li>Tap the <b>☰ menu</b> at the bottom-right of Samsung Internet.</li><li>Tap <b>Add page to</b>, then <b>Home screen</b>.</li><li>Tap <b>Add</b> — the ♠ Spades icon lands on your home screen and launches the game like an app, even offline.</li></ol>';
+  } else if(/firefox/i.test(ua) && /android/i.test(ua)){
+    body.innerHTML = '<p><b>On Android (Firefox):</b></p><ol class="rules"><li>Tap the <b>⋮ menu</b> in Firefox.</li><li>Tap <b>Add to Home screen</b>.</li><li>Tap <b>Add</b> — the ♠ Spades icon lands on your home screen and launches the game like an app.</li></ol>';
   } else if(/android/i.test(ua)){
     body.innerHTML = '<p><b>On Android (Chrome):</b></p><ol class="rules"><li>Tap the <b>⋮ menu</b> at the top-right of Chrome.</li><li>Tap <b>Install app</b> (or <b>Add to Home screen</b>).</li><li>Tap <b>Install</b> — the ♠ Spades icon lands on your home screen and launches the game like an app, even offline.</li></ol><p class="small muted">If an install prompt pops up on its own while you play, that works too.</p>';
   } else {
-    body.innerHTML = '<p><b>On a computer (Chrome / Edge):</b> click the install icon in the address bar, or open the browser menu and choose <b>Install Spades</b>.</p><p><b>On a phone:</b> open this page in Chrome (Android) and tap ⋮ → <b>Install app</b>, or in Safari (iPhone) tap Share → <b>Add to Home Screen</b>. The ♠ icon then launches the game straight from your home screen.</p>';
+    body.innerHTML = '<p><b>On a computer (Chrome / Edge):</b> click the install icon in the address bar, or open the browser menu and choose <b>Install Spades</b>.</p><p><b>On a phone:</b> open this page in Chrome or Samsung Internet (Android) and tap <b>Install app</b> here, or in Safari (iPhone) tap Share → <b>Add to Home Screen</b>. The ♠ icon then launches the game straight from your home screen.</p>';
   }
 }
-$('installNowBtn').addEventListener('click', async function(){
-  if(!bipEvent){ openInstall(); return; }
-  bipEvent['prompt']();
-  try{ await bipEvent.userChoice; }catch(e){}
-  bipEvent = null; closeAll();
+$('installNowBtn').addEventListener('click', function(){
+  if(!tryNativeInstall()) openInstall();
 });
 </script>
 <script>
@@ -976,8 +1017,8 @@ $('resultBtn').addEventListener('click',function(){
 $('howBtn1').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
 $('howBtn2').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
 $('closeHowBtn').addEventListener('click',closeAll);
-$('installBtn1').addEventListener('click',openInstall);
-$('installBtn2').addEventListener('click',openInstall);
+$('installBtn1').addEventListener('click',onInstallTap);
+$('installBtn2').addEventListener('click',onInstallTap);
 $('closeInstallBtn').addEventListener('click',closeAll);
 $('soundBtn').addEventListener('click',function(){ soundOn=!soundOn; $('soundHint').textContent=soundOn?'on':'off'; if(soundOn) sndWin(); });
 /* ================= Deck styles ================= */
