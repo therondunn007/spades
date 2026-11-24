@@ -1992,7 +1992,23 @@ function mpConnect(){
     }
     var auth=firebase.auth();
     if(auth.currentUser){ MP.uid=auth.currentUser.uid; return MP.uid; }
-    return auth.signInAnonymously().then(function(cred){ MP.uid=cred.user.uid; return MP.uid; });
+    /* Wait for the first auth-state callback before signing in: it only
+       fires once any saved sign-in on this device has been restored.
+       Calling signInAnonymously() while currentUser is still restoring
+       can mint a brand-new uid and orphan everything keyed to the old
+       one — the claimed game name, a table seat, and friend requests
+       addressed to the old uid — so a request could be written
+       successfully yet never arrive on a phone now listening under a
+       different uid. */
+    return new Promise(function(res){
+      var done=false, un=null;
+      var finish=function(u){ if(done) return; done=true; if(un){ try{ un(); }catch(e){} } res(u); };
+      un=auth.onAuthStateChanged(function(u){ finish(u); });
+      setTimeout(function(){ finish(auth.currentUser); }, 6000);
+    }).then(function(u){
+      if(u){ MP.uid=u.uid; return MP.uid; }
+      return auth.signInAnonymously().then(function(cred){ MP.uid=cred.user.uid; return MP.uid; });
+    });
   });
 }
 function mpRef(path){ return MP.db.ref('rooms/'+MP.code+(path?'/'+path:'')); }
@@ -2883,9 +2899,15 @@ $('lobbyCopyBtn').addEventListener('click', function(){
                                                 free or already this player's)
      profiles/{uid}              -> { handle, name, updatedAt }
      friendRequests/{toUid}/{fromUid}   -> { fromHandle, fromName, at }
+         (an answer can ride this same node with accepted:true or
+          declined:true instead of fromHandle data — see frAcceptRequest)
      friendOut/{uid}/{toUid}     -> { toHandle, at }   (requests I sent)
      friends/{uid}/{friendUid}   -> { handle, name, since }
-     tableInvites/{toUid}/{id}   -> { fromUid, fromHandle, fromName, code, at }
+     tableInvites/{toUid}/{fromUid} -> { fromUid, fromHandle, fromName, code, at }
+         (keyed by the sender's uid: one live invite per sender, and the
+          exact child node the recipient's per-player listener watches)
+     friendAccepts/{toUid}/{fromUid}  -> { handle, name, since }
+     friendDeclines/{toUid}/{fromUid} -> { at }
    Search and the browsable directory both read the handles node with a
    key-ordered query (orderByKey), so the security rules need a read rule
    on the handles node itself, not only on handles/{handle}.
@@ -2895,7 +2917,12 @@ $('lobbyCopyBtn').addEventListener('click', function(){
 var FR={
   uid:null, handle:null, watching:false,
   friends:{}, incoming:{}, outgoing:{}, invites:{}, directory:{},
-  _seenReq:{}, _seenInv:{}, _bannerDismissed:null, _searchTimer:null
+  _seenReq:{}, _seenInv:{}, _bannerDismissed:null, _searchTimer:null,
+  /* Inbox data arrives through two feeds that frMergeInbox unions:
+     whole-inbox listeners (…P stores) and per-player child listeners
+     (…C stores). Keeping both is the delivery fix — see frStartWatch. */
+  _src:{ incP:{}, incC:{}, invP:{}, invC:{}, outP:{}, outC:{}, frP:{}, frC:{} },
+  _childWatched:{}, _acceptHandled:{}, _declineHandled:{}, _parentErrShown:false
 };
 var FR_HANDLE_KEY='spades.frHandle.v1';
 var FR_DIR_CAP=200, FR_SEARCH_CAP=20;
@@ -2918,6 +2945,10 @@ function frEnsure(){
 function frStartWatch(){
   if(FR.watching || !FR.uid || !MP.db) return;
   FR.watching=true;
+  /* "New arrival" toasts arm after the opening sweep has had a moment
+     to land, so requests already waiting don't all beep at once when
+     Friends is opened. */
+  setTimeout(function(){ FR._reqPrimed=true; FR._invPrimed=true; }, 3000);
   /* My own profile: keeps this phone's claimed handle in sync. */
   frDb('profiles/'+FR.uid).on('value', function(snap){
     var p=snap.val();
@@ -2936,41 +2967,146 @@ function frStartWatch(){
       var inp2=$('frHandleInput'); if(inp2 && document.activeElement!==inp2) inp2.value='';
     }
     frRenderAll();
-  });
+  }, function(){ frParentReadError(); });
+  /* Whole-inbox listeners: one feed of frMergeInbox. Every one carries
+     an error callback now — a refused read reports itself (once) and
+     the per-player feed below carries delivery instead of silence. */
   frDb('friendRequests/'+FR.uid).on('value', function(snap){
-    var val=snap.val()||{};
-    Object.keys(val).forEach(function(k){
-      if(!FR._seenReq[k] && Object.keys(FR._seenReq).length>=0 && FR._reqPrimed){
-        toast((val[k] && val[k].fromHandle ? '@'+val[k].fromHandle : 'A player')+' sent you a friend request ♠');
-        try{ beep(880,0.09,0.05); }catch(e){}
-      }
-      FR._seenReq[k]=true;
-    });
-    FR._reqPrimed=true;
-    FR.incoming=val;
-    frRenderAll();
-  });
-  frDb('friendOut/'+FR.uid).on('value', function(snap){ FR.outgoing=snap.val()||{}; frRenderAll(); });
-  frDb('friends/'+FR.uid).on('value', function(snap){ FR.friends=snap.val()||{}; frRenderAll(); });
+    FR._src.incP=snap.val()||{};
+    frMergeInbox();
+  }, function(){ frParentReadError(); });
+  frDb('friendOut/'+FR.uid).on('value', function(snap){ FR._src.outP=snap.val()||{}; frMergeInbox(); }, function(){ frParentReadError(); });
+  frDb('friends/'+FR.uid).on('value', function(snap){ FR._src.frP=snap.val()||{}; frWatchDirectoryPlayers(); frMergeInbox(); }, function(){ frParentReadError(); });
   frDb('tableInvites/'+FR.uid).on('value', function(snap){
+    FR._src.invP=snap.val()||{};
+    frMergeInbox();
+  }, function(){ frParentReadError(); });
+  frDb('friendAccepts/'+FR.uid).on('value', function(snap){
     var val=snap.val()||{};
-    Object.keys(val).forEach(function(k){
-      if(!FR._seenInv[k] && FR._invPrimed){
-        toast((val[k] && val[k].fromName ? cleanName(val[k].fromName) : 'A friend')+' invited you to their Spades table ♠');
-        try{ beep(880,0.09,0.05); }catch(e){}
-      }
-      FR._seenInv[k]=true;
-    });
-    FR._invPrimed=true;
-    FR.invites=val;
-    frRenderAll();
-  });
+    Object.keys(val).forEach(function(k){ frProcessAccept(k, val[k]); });
+  }, function(){});
   /* The browsable directory: every enrolled handle, A–Z, kept live.
      Capped so a long list stays light; search reaches past the cap. */
   frDb('handles').orderByKey().limitToFirst(FR_DIR_CAP).on('value', function(snap){
     FR.directory=snap.val()||{};
+    /* Every enrolled player gets per-player inbox watchers — the feed
+       that delivers requests and invites even when a whole-inbox read
+       is refused by per-child rules. */
+    frWatchDirectoryPlayers();
     frRenderDirectory();
+  }, function(){ frParentReadError(); });
+}
+/* ---------- Inbox delivery: two feeds, merged ----------
+   Why two feeds (the 2026-11-24 two-phone test failure): sending a
+   friend request writes friendRequests/{recipient}/{sender} and that
+   write went through — the sender saw the "sent" confirmation. But the
+   recipient read with ONE listener on the whole friendRequests/{me}
+   node, and Firebase rules grant a read only at the node a rule covers
+   or above it — a rule written per child node (…/{sender}) does not
+   grant reading the parent. With no error callback attached, that
+   refusal was completely silent: no request ever rendered, in either
+   direction, and no error anywhere. So now every inbox is read BOTH
+   ways: the whole-inbox listener (works when the rules grant the
+   parent read) and a per-player listener on the exact child node each
+   enrolled player writes to (works when the rules are per-child).
+   frMergeInbox unions the two feeds; whichever shape the rules take,
+   delivery lands. Table invites get the same treatment, and listener
+   errors surface a note instead of failing silently. */
+function frParentReadError(){
+  if(FR._parentErrShown) return;
+  FR._parentErrShown=true;
+  try{ console.warn('Spades friends: a whole-inbox read was refused; per-player updates are carrying delivery instead.'); }catch(e){}
+  toast('Friends inbox switched to direct per-player updates ♠');
+}
+function frHandleOfUid(uid){
+  var hs=Object.keys(FR.directory||{});
+  for(var i=0;i<hs.length;i++){ if(FR.directory[hs[i]]===uid) return hs[i]; }
+  return null;
+}
+function frMergeInbox(){
+  var prevReq=FR.incoming||{}, prevInv=FR.invites||{};
+  var inc={}; Object.assign(inc, FR._src.incP, FR._src.incC);
+  var inv={}; Object.assign(inv, FR._src.invP, FR._src.invC);
+  /* Answers riding the request channel: an entry flagged accepted or
+     declined is not a new request — pull it out of the requests list
+     and route it to the answer handlers below. */
+  var answers=[];
+  Object.keys(inc).forEach(function(k){
+    var e=inc[k];
+    if(e && (e.accepted || e.declined)){
+      answers.push({ uid:k, entry:e });
+      delete inc[k];
+      delete FR._src.incP[k]; delete FR._src.incC[k];
+    }
   });
+  Object.keys(inc).forEach(function(k){
+    if(!FR._seenReq[k]){
+      FR._seenReq[k]=true;
+      if(FR._reqPrimed && !prevReq[k]){
+        toast((inc[k] && inc[k].fromHandle ? '@'+inc[k].fromHandle : 'A player')+' sent you a friend request ♠');
+        try{ beep(880,0.09,0.05); }catch(e){}
+      }
+    }
+  });
+  Object.keys(inv).forEach(function(k){
+    if(!FR._seenInv[k]){
+      FR._seenInv[k]=true;
+      if(FR._invPrimed && !prevInv[k]){
+        toast((inv[k] && inv[k].fromName ? cleanName(inv[k].fromName) : 'A friend')+' invited you to their Spades table ♠');
+        try{ beep(880,0.09,0.05); }catch(e){}
+      }
+    }
+  });
+  FR.incoming=inc; FR.invites=inv;
+  FR.outgoing={}; Object.assign(FR.outgoing, FR._src.outP, FR._src.outC);
+  FR.friends={}; Object.assign(FR.friends, FR._src.frP, FR._src.frC);
+  frRenderAll();
+  answers.forEach(function(a){
+    if(a.entry.accepted) frProcessAccept(a.uid, { handle:a.entry.fromHandle||'', name:a.entry.fromName||'', since:a.entry.at||0 });
+    else frProcessDecline(a.uid, { at:a.entry.at||0 });
+    /* Clear the note from my inbox. If the rules only let the sender
+       write this node the note simply stays; the handled-stamp in the
+       answer handlers keeps a leftover note harmless. */
+    frDb('friendRequests/'+FR.uid+'/'+a.uid).set(null).catch(function(){});
+  });
+}
+/* Watch the exact child nodes one other player writes to in MY inbox:
+   their request to me, their table invite to me, my outgoing marker
+   for them, my friends entry for them, and their answer to a request
+   I sent them. These reads are granted by per-child rules even when
+   the whole-inbox read is not. */
+function frWatchUid(uid){
+  if(!uid || uid===FR.uid || !FR.uid || typeof MP==='undefined' || !MP.db) return;
+  if(FR._childWatched[uid]) return;
+  if(Object.keys(FR._childWatched).length>=300) return;
+  FR._childWatched[uid]=true;
+  frDb('friendRequests/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) FR._src.incC[uid]=v; else delete FR._src.incC[uid];
+    frMergeInbox();
+  }, function(){});
+  frDb('tableInvites/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) FR._src.invC[uid]=v; else delete FR._src.invC[uid];
+    frMergeInbox();
+  }, function(){});
+  frDb('friendOut/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) FR._src.outC[uid]=v; else delete FR._src.outC[uid];
+    frMergeInbox();
+  }, function(){});
+  frDb('friends/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) FR._src.frC[uid]=v; else delete FR._src.frC[uid];
+    frMergeInbox();
+  }, function(){});
+  frDb('friendAccepts/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) frProcessAccept(uid, v);
+  }, function(){});
+  frDb('friendDeclines/'+FR.uid+'/'+uid).on('value', function(snap){
+    var v=snap.val(); if(v) frProcessDecline(uid, v);
+  }, function(){});
+}
+function frWatchDirectoryPlayers(){
+  Object.keys(FR.directory||{}).forEach(function(h){ frWatchUid(FR.directory[h]); });
+  Object.keys(FR.friends||{}).forEach(function(uid){ frWatchUid(uid); });
+  Object.keys(FR.outgoing||{}).forEach(function(uid){ frWatchUid(uid); });
 }
 /* ---------- Claim / change my handle ---------- */
 function frClaim(){
@@ -3102,14 +3238,28 @@ function frDeleteHandle(){
 }
 /* ---------- Friend requests ---------- */
 function frSendRequestTo(toUid, toHandle){
-  if(!FR.uid) return;
+  if(!FR.uid){
+    /* Never fail silently: connect first, then send. */
+    frEnsure().then(function(){ frSendRequestTo(toUid, toHandle); }).catch(function(){
+      toast('Could not connect — check your internet and try again.');
+    });
+    return;
+  }
   if(!FR.handle){ frHandleStatus('Claim your own game name first (above) — your friend needs to see who the request is from.'); try{ $('frHandleInput').focus(); }catch(e){} return; }
   if(toUid===FR.uid){ toast('That\'s your own game name.'); return; }
   if(FR.friends[toUid]){ toast('You\'re already friends with @'+toHandle+'.'); return; }
   if(FR.outgoing[toUid]){ toast('Your request to @'+toHandle+' is already sent — waiting for them to answer.'); return; }
+  /* They already asked me — sending a request back completes the
+     friendship on the spot instead of leaving two crossed requests. */
+  if(FR.incoming[toUid]){ frAcceptRequest(toUid); return; }
   var data={ fromHandle:FR.handle, fromName:mpMyName(), at:Date.now() };
+  frWatchUid(toUid);
   frDb('friendRequests/'+toUid+'/'+FR.uid).set(data).then(function(){
     frDb('friendOut/'+FR.uid+'/'+toUid).set({ toHandle:toHandle, at:Date.now() }).catch(function(){});
+    /* Show the request as pending right away, on this phone, without
+       waiting for any listener to echo it back. */
+    FR._src.outC[toUid]={ toHandle:toHandle, at:Date.now() };
+    frMergeInbox();
     toast('Friend request sent to @'+toHandle+' — they\'ll see it in their game ♠');
     frSetStatus('frAddStatus','Request sent to @'+toHandle+'.');
     frSetStatus('frSearchStatus','Request sent to @'+toHandle+'.');
@@ -3133,19 +3283,79 @@ function frAddByHandle(){
 }
 function frAcceptRequest(fromUid){
   var req=FR.incoming[fromUid]; if(!req || !FR.uid) return;
-  var mine={ handle:req.fromHandle||'', name:cleanName(req.fromName||'')||'Player', since:Date.now() };
-  var theirs={ handle:FR.handle||'', name:mpMyName(), since:Date.now() };
+  var stamp=Date.now();
+  var mine={ handle:req.fromHandle||'', name:cleanName(req.fromName||'')||'Player', since:stamp };
+  var theirs={ handle:FR.handle||'', name:mpMyName(), since:stamp };
+  /* My own friends entry — an owner write, reflected on screen at once. */
   frDb('friends/'+FR.uid+'/'+fromUid).set(mine).catch(function(){});
+  FR._src.frC[fromUid]=mine;
+  /* Tell the sender, through channels known to reach them. The old code
+     only wrote into the sender's own friends node — a cross-player
+     write the rules can refuse, swallowed by an empty catch, so the
+     sender never learned they'd been accepted and the friendship (and
+     the table invite that depends on it) never completed on their
+     phone. Now the answer also rides the request channel itself —
+     friendRequests/{sender}/{me}, the exact write a friend request
+     uses — flagged accepted, plus the dedicated friendAccepts node.
+     The sender's watchers route either copy to frProcessAccept. */
+  frDb('friendRequests/'+fromUid+'/'+FR.uid).set({ fromHandle:FR.handle||'', fromName:mpMyName(), accepted:true, at:stamp }).catch(function(){});
+  frDb('friendAccepts/'+fromUid+'/'+FR.uid).set(theirs).catch(function(){});
   frDb('friends/'+fromUid+'/'+FR.uid).set(theirs).catch(function(){});
   frDb('friendRequests/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  delete FR._src.incP[fromUid]; delete FR._src.incC[fromUid];
   frDb('friendOut/'+fromUid+'/'+FR.uid).set(null).catch(function(){});
+  frMergeInbox();
   toast('You and @'+(req.fromHandle||'player')+' are friends now ♠');
 }
 function frDeclineRequest(fromUid){
   if(!FR.uid) return;
+  var stamp=Date.now();
   frDb('friendRequests/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  delete FR._src.incP[fromUid]; delete FR._src.incC[fromUid];
+  /* Let the sender's phone clear its "request sent" marker the same
+     way an accept reaches it (see frAcceptRequest). */
+  frDb('friendRequests/'+fromUid+'/'+FR.uid).set({ fromHandle:FR.handle||'', fromName:mpMyName(), declined:true, at:stamp }).catch(function(){});
+  frDb('friendDeclines/'+fromUid+'/'+FR.uid).set({ at:stamp }).catch(function(){});
   frDb('friendOut/'+fromUid+'/'+FR.uid).set(null).catch(function(){});
+  frMergeInbox();
   toast('Friend request declined.');
+}
+/* ---------- Answers to requests I sent ---------- */
+function frProcessAccept(fromUid, info){
+  if(!info || !FR.uid) return;
+  var stamp=info.since||info.at||0;
+  if(FR._acceptHandled[fromUid]===stamp) return;
+  FR._acceptHandled[fromUid]=stamp;
+  var wasFriend=!!FR.friends[fromUid];
+  var entry={ handle:info.handle||'', name:cleanName(info.name||'')||'Player', since:stamp||Date.now() };
+  if(!wasFriend){
+    /* My own friends entry — an owner write, so it cannot be refused
+       the way the accepter's cross-player write could be. */
+    frDb('friends/'+FR.uid+'/'+fromUid).set(entry).catch(function(){});
+    FR._src.frC[fromUid]=entry;
+  }
+  frDb('friendAccepts/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  if(FR.outgoing[fromUid]){
+    frDb('friendOut/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+    delete FR._src.outP[fromUid]; delete FR._src.outC[fromUid];
+  }
+  frMergeInbox();
+  if(!wasFriend) toast('@'+(entry.handle||'player')+' accepted your friend request — you\'re friends now ♠');
+}
+function frProcessDecline(fromUid, info){
+  if(!info || !FR.uid) return;
+  var stamp=info.at||info.since||0;
+  if(FR._declineHandled[fromUid]===stamp) return;
+  FR._declineHandled[fromUid]=stamp;
+  var nm=(FR.outgoing[fromUid] && FR.outgoing[fromUid].toHandle) || frHandleOfUid(fromUid) || 'player';
+  var hadOutgoing=!!FR.outgoing[fromUid];
+  frDb('friendDeclines/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  if(hadOutgoing){
+    frDb('friendOut/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+    delete FR._src.outP[fromUid]; delete FR._src.outC[fromUid];
+    toast('Your friend request to @'+nm+' was declined this time.');
+  }
+  frMergeInbox();
 }
 /* ---------- Search enrolled handles ---------- */
 function frDoSearch(){
@@ -3169,6 +3379,9 @@ function frDoSearch(){
 }
 /* ---------- One player row (search results + directory) ---------- */
 function frPlayerRow(uid, handle){
+  /* Anyone surfaced by search or the directory gets per-player inbox
+     watchers too, even past the directory cap. */
+  try{ frWatchUid(uid); }catch(e){}
   var row=document.createElement('div'); row.className='fr-row';
   var who=document.createElement('div'); who.className='who';
   var b=document.createElement('b'); b.textContent='@'+handle;
@@ -3209,13 +3422,22 @@ function frRenderDirectory(){
 }
 /* ---------- Table invites ---------- */
 function frInviteFriend(toUid, handle){
-  if(!FR.uid) return;
+  if(!FR.uid){
+    frEnsure().then(function(){ frInviteFriend(toUid, handle); }).catch(function(){
+      toast('Could not connect — check your internet and try again.');
+    });
+    return;
+  }
   if(!(typeof MP!=='undefined' && MP && MP.active && MP.code)){
     toast('Create or join a table first — then invite @'+handle+' from here.');
     return;
   }
   if(!FR.handle){ frHandleStatus('Claim your game name first (above) — your friend needs to see who invited them.'); frOpen(); return; }
-  var id=FR.uid+'-'+Date.now();
+  /* Keyed by the sender's uid: one live invite per sender per friend,
+     and the exact child node the recipient's per-player watcher reads
+     (a timestamped key could only be found by a whole-inbox read —
+     the read that silently failed for friend requests). */
+  var id=FR.uid;
   frDb('tableInvites/'+toUid+'/'+id).set({
     fromUid:FR.uid, fromHandle:FR.handle, fromName:mpMyName(), code:MP.code, at:Date.now()
   }).then(function(){
