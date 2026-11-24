@@ -269,6 +269,16 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .fr-banner .fr-banner-btns button.accept{background:var(--gold);color:#231a02;border:none}
 .fr-directory{max-height:264px;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:2px 10px 10px;margin-top:8px;background:rgba(0,0,0,.18)}
 .fr-directory .fr-row{background:rgba(0,0,0,.32)}
+#frCurrentName[hidden]{display:none !important}
+.fr-row button.fr-delete{border-color:rgba(230,110,90,.6);color:#ffb9a8}
+.fr-confirm{background:rgba(163,51,39,.16);border:1px solid rgba(220,100,80,.55);border-radius:12px;padding:12px 13px;margin-top:8px;font-family:Verdana,sans-serif;font-size:13.5px;line-height:1.55}
+.fr-confirm[hidden]{display:none !important}
+.fr-confirm p{margin:0}
+.fr-confirm-btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.fr-confirm-btns button{flex:1;padding:10px;border-radius:10px;font-size:15px;font-weight:bold;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--text);font-family:Georgia,serif}
+.fr-confirm-btns button.danger{background:var(--danger);color:#fff;border:none}
+.fr-confirm-btns button:active{transform:scale(.97)}
+.fr-confirm-btns button[disabled]{opacity:.45}
 </style>
 </head>
 <body data-deck="classic">
@@ -543,6 +553,20 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <input class="fr-input" id="frHandleInput" maxlength="16" placeholder="e.g. theron_7" autocomplete="off" autocapitalize="none" aria-label="Your game name">
     <button class="big-btn" id="frClaimBtn">Claim / change my game name</button>
     <p class="fr-status" id="frHandleStatus" role="status"></p>
+    <div id="frCurrentName" hidden>
+      <div class="fr-row">
+        <div class="who"><b id="frCurrentNameText">@name</b><span class="tag">Your claimed game name</span></div>
+        <button type="button" class="fr-delete" id="frDeleteBtn">Delete my game name</button>
+      </div>
+      <div class="fr-confirm" id="frDeleteConfirm" hidden>
+        <p><b>Delete your game name <span id="frDeleteNameText">@name</span>?</b> This removes it from the game completely: it disappears from search and the browse list, and the name becomes free for anyone else to claim. Your friends stay as they are, but nobody will be able to find or add you by this name. You can claim a new game name any time. This can't be undone.</p>
+        <div class="fr-confirm-btns">
+          <button type="button" class="danger" id="frDeleteYesBtn">Yes, delete my game name</button>
+          <button type="button" id="frDeleteNoBtn">Keep my name</button>
+        </div>
+      </div>
+      <p class="fr-status" id="frDeleteStatus" role="status"></p>
+    </div>
 
     <h3>Find a player — search game names</h3>
     <p class="small muted" style="margin:2px 0 8px">Don't know their exact name? Type part of it and pick from the players who have claimed a game name. Tapping a result sends them a friend request.</p>
@@ -2898,9 +2922,18 @@ function frStartWatch(){
   frDb('profiles/'+FR.uid).on('value', function(snap){
     var p=snap.val();
     if(p && p.handle){
+      FR._profileLoaded=true;
       FR.handle=p.handle;
       try{ localStorage.setItem(FR_HANDLE_KEY, p.handle); }catch(e){}
       var inp=$('frHandleInput'); if(inp && document.activeElement!==inp) inp.value=p.handle;
+    } else if(!p && FR._profileLoaded){
+      /* My profile is gone (the game name was deleted) — this phone has
+         no game name until a new one is claimed. Only honoured after a
+         profile was actually seen, so a fresh claim in flight is never
+         wiped by an early empty snapshot. */
+      FR.handle=null;
+      try{ localStorage.removeItem(FR_HANDLE_KEY); }catch(e){}
+      var inp2=$('frHandleInput'); if(inp2 && document.activeElement!==inp2) inp2.value='';
     }
     frRenderAll();
   });
@@ -2969,6 +3002,102 @@ function frClaim(){
     });
   }).catch(function(){
     frHandleStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+/* ---------- Delete my game name ----------
+   Removes BOTH records that make a name enrolled:
+     handles/{handle} -> null   (the unique claim; search and the
+                                 browsable directory both read this node,
+                                 so the name leaves both at once, and the
+                                 freed name can be claimed by anyone)
+     profiles/{uid}   -> null   (this player's own profile entry)
+   The deletes use the exact same owner writes the change-name flow
+   already relies on (handles/{old} is set to null there after checking
+   the stored uid matches), and profiles/{uid} is only ever written by
+   its owner. Afterwards this player simply has no game name — the claim
+   box above is how a new one gets claimed. Friends lists are left
+   untouched: they key off uid, not the name. */
+function frSyncHandleUI(){
+  var wrap=$('frCurrentName'); if(!wrap) return;
+  var has=!!FR.handle;
+  wrap.hidden=!has;
+  if(has){
+    $('frCurrentNameText').textContent='@'+FR.handle;
+    /* If the confirmation is open for a name that is no longer this
+       player's (claimed a different one meanwhile), close it — a
+       background re-render must never close it otherwise. */
+    var conf=$('frDeleteConfirm');
+    if(conf && !conf.hidden && FR._confirmHandle && FR._confirmHandle!==FR.handle) conf.hidden=true;
+  }
+}
+function frDeleteHandle(){
+  if(FR._deleteBusy) return;
+  if(!FR.uid || !FR.handle){
+    frSetStatus('frDeleteStatus','You have no game name to delete right now.');
+    return;
+  }
+  /* Delete exactly the name the confirmation named, and only while it
+     is still this player's own claimed name. */
+  var h=FR._confirmHandle || FR.handle;
+  if(h!==FR.handle){
+    $('frDeleteConfirm').hidden=true;
+    frSetStatus('frDeleteStatus','Your game name changed — tap Delete to review the current name first.');
+    return;
+  }
+  FR._deleteBusy=true;
+  var yes=$('frDeleteYesBtn'), no=$('frDeleteNoBtn'), del=$('frDeleteBtn');
+  if(yes) yes.disabled=true; if(no) no.disabled=true; if(del) del.disabled=true;
+  frSetStatus('frDeleteStatus','Deleting @'+h+'…');
+  frEnsure().then(function(){
+    /* Only the owner can free a name: read the claim back and delete it
+       only if it still points at this player. */
+    return frDb('handles/'+h).once('value').then(function(snap){
+      if(snap.val()!==FR.uid){
+        throw new Error('claim-mismatch');
+      }
+      return frDb('handles/'+h).set(null);
+    });
+  }).then(function(){
+    /* The claim is freed. Now remove the profile entry too. */
+    return frDb('profiles/'+FR.uid).set(null).then(function(){
+      return true;
+    }, function(){
+      return false; /* profile delete refused — reported below */
+    });
+  }).then(function(profileGone){
+    FR.handle=null;
+    FR._confirmHandle=null;
+    FR._profileLoaded=false;
+    try{ localStorage.removeItem(FR_HANDLE_KEY); }catch(e){}
+    var inp=$('frHandleInput'); if(inp) inp.value='';
+    FR._deleteBusy=false;
+    if(yes) yes.disabled=false; if(no) no.disabled=false; if(del) del.disabled=false;
+    var conf=$('frDeleteConfirm'); if(conf) conf.hidden=true;
+    frSyncHandleUI();
+    if(profileGone){
+      frHandleStatus('Your game name @'+h+' has been deleted. You have no game name now — claim a new one above whenever you like.');
+      frSetStatus('frDeleteStatus','');
+      toast('Game name @'+h+' deleted — the name is free again ♠');
+    } else {
+      frHandleStatus('Your game name @'+h+' is no longer claimed and no longer shows in search or the browse list, but its profile entry could not be removed — check your connection and open Friends again; if it is still listed here, delete once more.');
+      toast('Game name @'+h+' unclaimed — profile cleanup did not finish.');
+    }
+    /* Refresh search results too, so a deleted name vanishes from any
+       results already on screen, not just from the directory. */
+    var sq=$('frSearchInput');
+    if(sq && frNormLoose(sq.value).length>=2) frDoSearch();
+    frRenderAll();
+  }).catch(function(err){
+    FR._deleteBusy=false;
+    FR._confirmHandle=null;
+    var conf2=$('frDeleteConfirm'); if(conf2) conf2.hidden=true;
+    if(yes) yes.disabled=false; if(no) no.disabled=false; if(del) del.disabled=false;
+    if(err && err.message==='claim-mismatch'){
+      frSetStatus('frDeleteStatus','That name is not claimed by this player, so it was not deleted.');
+    } else {
+      frSetStatus('frDeleteStatus','Your game name could not be deleted — check your internet connection and try again. If it keeps failing, the database rules may not allow deleting your own name; your name has not been changed.');
+      try{ sndBad(); }catch(e){}
+    }
   });
 }
 /* ---------- Friend requests ---------- */
@@ -3116,6 +3245,7 @@ function frDeclineInvite(id){
 }
 /* ---------- Rendering ---------- */
 function frRenderAll(){
+  frSyncHandleUI();
   frRenderBadges();
   frRenderRequests();
   frRenderInvites();
@@ -3251,6 +3381,23 @@ $('frCloseBtn').addEventListener('click', function(){
   if(typeof MP!=='undefined' && MP && MP.active && MP.code && MP.meta && MP.meta.status==='lobby') mpEnterLobby();
 });
 $('frClaimBtn').addEventListener('click', frClaim);
+/* Delete-my-name wiring: the button lives only inside #frCurrentName,
+   which frSyncHandleUI shows solely when THIS player has a claimed name
+   (FR.handle comes from this player's own profile) — it never renders
+   on anyone else's row in search, the directory, or the friends list. */
+$('frDeleteBtn').addEventListener('click', function(){
+  if(!FR.handle) return;
+  FR._confirmHandle=FR.handle;
+  $('frDeleteNameText').textContent='@'+FR.handle;
+  $('frDeleteConfirm').hidden=false;
+  frSetStatus('frDeleteStatus','');
+});
+$('frDeleteNoBtn').addEventListener('click', function(){
+  FR._confirmHandle=null;
+  $('frDeleteConfirm').hidden=true;
+  frSetStatus('frDeleteStatus','');
+});
+$('frDeleteYesBtn').addEventListener('click', frDeleteHandle);
 $('frHandleInput').addEventListener('keydown', function(e){ if(e.key==='Enter') frClaim(); });
 $('frAddBtn').addEventListener('click', frAddByHandle);
 $('frAddInput').addEventListener('keydown', function(e){ if(e.key==='Enter') frAddByHandle(); });
