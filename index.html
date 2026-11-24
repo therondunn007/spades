@@ -212,6 +212,10 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
 .wake-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#777;vertical-align:middle}
 .wake-dot.on{background:#57d977;box-shadow:0 0 7px #57d977}
 #wakeChip{cursor:pointer}
+.name-field{margin:10px 0}
+.name-field label{display:block;font-family:Verdana,sans-serif;font-size:12.5px;color:var(--muted);margin-bottom:5px;line-height:1.45}
+.name-field input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--text);font-size:16px;font-family:inherit}
+#namesForm h3{margin:16px 0 2px;font-size:16px}
 .footer-note{text-align:center;margin-top:16px}
 </style>
 </head>
@@ -234,6 +238,7 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
     <div class="panel">
       <h2>Pick your table</h2>
       <p class="muted">You play against the computer. The deck is shuffled fresh for every deal, and <b>spades can be led on any trick</b> — no need to wait for them to be broken. After each deal you'll see your cards first and tap <b>Ready</b> when you want to bid — no rush.</p>
+      <p class="small muted">No need to finish in one sitting — the game remembers where you are, so close it any time and it picks back up right where you left off when you return.</p>
       <h3 style="margin:14px 0 2px">How many players?</h3>
       <div class="seg" id="countSeg" role="group" aria-label="Number of players">
         <button data-n="2"><span class="n">2</span>Heads-up</button>
@@ -250,6 +255,7 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
       <button class="big-btn" id="dealBtn">Shuffle &amp; deal</button>
       <button class="ghost-btn" id="howBtn1">How to play &amp; scoring</button>
       <button class="ghost-btn" id="installBtn1">⬇ Install app — add to home screen</button>
+      <button class="ghost-btn" id="namesBtn1">✎ Player names</button>
     </div>
   </section>
 
@@ -283,6 +289,7 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
       <button id="scoreModeBtn"><span>🏆 Scoring</span><span class="hint" id="scoreModeHint">Bid = points · first to 35</span></button>
       <button id="setupBtn"><span>♠ New table setup</span><span class="hint">change player count</span></button>
       <button id="deckBtn"><span>🃏 Card deck</span><span class="hint" id="deckHint">Classic</span></button>
+      <button id="namesBtn"><span>✎ Player names</span><span class="hint">yours + the table's</span></button>
       <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
       <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
       <button id="soundBtn"><span>🔊 Sound</span><span class="hint" id="soundHint">on</span></button>
@@ -334,6 +341,17 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
   </div>
 </div>
 
+<!-- ============ PLAYER NAMES ============ -->
+<div class="overlay" id="namesOverlay" role="dialog" aria-modal="true" aria-label="Player names">
+  <div class="sheet">
+    <h2>Player names</h2>
+    <p class="small muted">Play under your own name — it shows on the table, the scoreboard and in the announcements — and rename the computer players too. Leave a box empty (or type the default) to keep the standard name. Names are remembered for next time.</p>
+    <div id="namesForm"></div>
+    <button class="big-btn" id="saveNamesBtn">Save names</button>
+    <button class="ghost-btn" id="closeNamesBtn">Cancel</button>
+  </div>
+</div>
+
 <!-- ============ BIDDING ============ -->
 <div class="overlay" id="bidOverlay" role="dialog" aria-modal="true" aria-label="Place your bid">
   <div class="sheet">
@@ -370,6 +388,8 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
       <li><b>Standard:</b> make your bid and you score <b>2 points per trick bid + 1 per extra trick</b>. Miss your bid and you <b>lose 1 point per trick bid</b>.</li>
       <li><b>Nil (bid 0):</b> take no tricks for <b>+10</b>; take any trick and it's <b>−10</b>. In partners, a nil is scored on its own, separate from your partner's bid.</li>
       <li>The winner of each trick leads the next one. Dealer rotates every hand.</li>
+      <li><b>Pick up where you left off:</b> the game saves itself as you play — close it any time, and when you come back your hand, the bids and the scores are right where you left them.</li>
+      <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name and rename the computer players too. Names are remembered for next time.</li>
     </ul>
     <button class="big-btn" id="closeHowBtn">Got it</button>
   </div>
@@ -502,7 +522,7 @@ if('serviceWorker' in navigator){
        scope, fall back to the plain registration; Add to Home Screen
        still works either way. */
     navigator.serviceWorker.register('sw.js', {scope:'./'}).catch(function(){
-      navigator.serviceWorker.register('data:application/javascript;base64,LyogU3BhZGVzIHNlcnZpY2Ugd29ya2VyIOKAlCBjYWNoZXMgdGhlIGdhbWUgc28gdGhlIGluc3RhbGxlZCBhcHAgd29ya3Mgb2ZmbGluZS4KICAgTmV0d29yay1maXJzdCBmb3IgdGhlIHBhZ2Ugc28gdXBkYXRlcyBhcnJpdmUsIGNhY2hlLWZpcnN0IGZvciBpY29ucy4gKi8KdmFyIENBQ0hFID0gJ3NwYWRlcy12Mic7CnZhciBDT1JFID0gWycuLycsICcuLi9pbmRleC5odG1sJywgJ2ljb24tMTkyLnBuZycsICdpY29uLTUxMi5wbmcnLCAnbWFuaWZlc3Qud2VibWFuaWZlc3QnXTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZnVuY3Rpb24gKGUpIHsKICBlLndhaXRVbnRpbChjYWNoZXMub3BlbihDQUNIRSkudGhlbihmdW5jdGlvbiAoYykgeyByZXR1cm4gYy5hZGRBbGwoQ09SRSkuY2F0Y2goZnVuY3Rpb24oKXt9KTsgfSkudGhlbihmdW5jdGlvbigpeyByZXR1cm4gc2VsZi5za2lwV2FpdGluZygpOyB9KSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2FjdGl2YXRlJywgZnVuY3Rpb24gKGUpIHsKICBlLndhaXRVbnRpbChjYWNoZXMua2V5cygpLnRoZW4oZnVuY3Rpb24gKGtleXMpIHsKICAgIHJldHVybiBQcm9taXNlLmFsbChrZXlzLm1hcChmdW5jdGlvbiAoaykgeyByZXR1cm4gayAhPT0gQ0FDSEUgPyBjYWNoZXMuZGVsZXRlKGspIDogbnVsbDsgfSkpOwogIH0pLnRoZW4oZnVuY3Rpb24oKXsgcmV0dXJuIHNlbGYuY2xpZW50cy5jbGFpbSgpOyB9KSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2ZldGNoJywgZnVuY3Rpb24gKGUpIHsKICBpZiAoZS5yZXF1ZXN0Lm1ldGhvZCAhPT0gJ0dFVCcpIHJldHVybjsKICBlLnJlc3BvbmRXaXRoKAogICAgZmV0Y2goZS5yZXF1ZXN0KS50aGVuKGZ1bmN0aW9uIChyZXMpIHsKICAgICAgdmFyIGNvcHkgPSByZXMuY2xvbmUoKTsKICAgICAgY2FjaGVzLm9wZW4oQ0FDSEUpLnRoZW4oZnVuY3Rpb24gKGMpIHsgYy5wdXQoZS5yZXF1ZXN0LCBjb3B5KTsgfSk7CiAgICAgIHJldHVybiByZXM7CiAgICB9KS5jYXRjaChmdW5jdGlvbiAoKSB7IHJldHVybiBjYWNoZXMubWF0Y2goZS5yZXF1ZXN0LCB7IGlnbm9yZVNlYXJjaDogdHJ1ZSB9KTsgfSkKICApOwp9KTsK').catch(function(){});
+      navigator.serviceWorker.register('sw.js').catch(function(){});
     });
   });
 }
@@ -599,6 +619,97 @@ var SCORING_EXPLAINS={
   bid:'Bid = points: bid 4 and make it, you score 4 — overtricks add nothing. Miss your bid and you lose your bid (−4). Nil still pays +10 / −10. First to 35 still wins.',
   standard:'Standard: make your bid for 2 points per trick bid + 1 per extra trick (bid 4, take 5 → 9 points). Miss your bid and you lose your bid. Nil still pays +10 / −10. First to 35 wins.'
 };
+/* ================= Persistence — autosave & remembered settings =================
+   The game saves itself to this device's local storage after every
+   change, so closing the app (or the browser) mid-hand loses nothing:
+   reopen it and the hand, bids, scores and turn are picked back up.
+   Settings — player names, deck, sound, scoring, table size — are
+   remembered the same way. Everything stays on this device. */
+var SAVE_KEY='spades.save.v1', SETTINGS_KEY='spades.settings.v1';
+var customNames={ you:'', ai:{ 2:[''], 3:['',''], 4:['','',''] } };
+function normalizeNames(n){
+  var out={ you:'', ai:{ 2:[''], 3:['',''], 4:['','',''] } };
+  if(!n) return out;
+  if(typeof n.you==='string') out.you=n.you;
+  [2,3,4].forEach(function(c){
+    if(n.ai && Array.isArray(n.ai[c])){
+      for(var i=0;i<out.ai[c].length;i++) if(typeof n.ai[c][i]==='string') out.ai[c][i]=n.ai[c][i];
+    }
+  });
+  return out;
+}
+function cleanName(s){
+  return (s||'').replace(/[<>&"']/g,'').replace(/\s+/g,' ').trim().slice(0,14);
+}
+function playerNameFor(count, idx){
+  if(idx===0) return customNames.you || 'You';
+  var c = customNames.ai[count] ? customNames.ai[count][idx-1] : '';
+  return c || AI_NAMES[count][idx-1];
+}
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({ v:1, deck:currentDeck, sound:soundOn, scoring:selectedScoring, count:selectedCount, names:customNames })); }catch(e){}
+}
+function loadSettings(){
+  var s=null;
+  try{ s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null'); }catch(e){}
+  if(!s) return;
+  customNames=normalizeNames(s.names);
+  if(s.count && EXPLAINS[s.count]){
+    selectedCount=s.count;
+    document.querySelectorAll('#countSeg button').forEach(function(b){ b.classList.toggle('sel', parseInt(b.getAttribute('data-n'),10)===selectedCount); });
+    $('countExplain').textContent=EXPLAINS[selectedCount];
+  }
+  if(s.scoring && SCORING_NAMES[s.scoring]) setScoringMode(s.scoring, true);
+  if(s.deck && DECK_NAMES[s.deck]) setDeck(s.deck, true);
+  if(typeof s.sound==='boolean'){ soundOn=s.sound; $('soundHint').textContent=soundOn?'on':'off'; }
+}
+function saveGame(){
+  if(!G) return;
+  try{
+    var data={ v:1, savedAt:Date.now(), G:G, msg:$('msg').innerHTML,
+      result: (G.phase==='scoring' && $('resultBody').innerHTML) ? { title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:$('resultBtn').textContent } : null };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  }catch(e){}
+}
+function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+/* Reopen a saved game exactly where it stopped — same hand, same bids,
+   same scores, same turn — and restart whatever was in flight: a bid
+   sheet waiting on the player, an AI player about to bid or play, a
+   finished trick about to be gathered, or the hand-result sheet. */
+function loadSavedGame(){
+  var raw=null; try{ raw=localStorage.getItem(SAVE_KEY); }catch(e){}
+  if(!raw) return false;
+  var data=null; try{ data=JSON.parse(raw); }catch(e){}
+  if(!data||!data.G||!data.G.players||data.G.players.length!==data.G.count||data.G.phase==='idle') return false;
+  G=data.G;
+  setGameActive(true);
+  $('startScreen').classList.remove('on');
+  $('gameScreen').classList.add('on');
+  closeAll();
+  if(G.phase==='scoring' && data.result){
+    $('resultTitle').textContent=data.result.title;
+    $('resultBody').innerHTML=data.result.body;
+    $('resultBtn').textContent=data.result.btn;
+    $('resultOverlay').classList.add('on');
+  }
+  renderAll();
+  if(data.msg) setMsg(data.msg);
+  if(G.phase==='bidding'){
+    if(G.current>=0 && G.players[G.current] && G.players[G.current].bid===null){
+      if(G.bidQueue && G.bidQueue[0]===G.current) G.bidQueue.shift();
+      takeBid(G.current);
+    } else nextBid();
+  } else if(G.phase==='playing'){
+    scheduleAI();
+  } else if(G.phase==='trickEnd'){
+    var e0=epoch;
+    setTimeout(function(){ if(e0===epoch) finishTrick(); }, 1100);
+  }
+  saveGame();
+  toast('Welcome back — your game picked up right where you left it ♠');
+  return true;
+}
+
 function scoringMode(){ return G && G.scoringMode ? G.scoringMode : selectedScoring; }
 function setScoringMode(mode, silent){
   if(!SCORING_NAMES[mode]) mode='bid';
@@ -613,8 +724,8 @@ function setScoringMode(mode, silent){
 function entities(){
   if(!G) return [];
   if(G.count===4) return [
-    {name:'You + Nate', members:[0,2], score:G.teamScores[0]},
-    {name:'Wanda + Earl', members:[1,3], score:G.teamScores[1]}
+    {name:G.players[0].name+' + '+G.players[2].name, members:[0,2], score:G.teamScores[0]},
+    {name:G.players[1].name+' + '+G.players[3].name, members:[1,3], score:G.teamScores[1]}
   ];
   return G.players.map(function(p,i){ return {name:p.name, members:[i], score:p.score}; });
 }
@@ -635,7 +746,8 @@ function startGame(count){
     phase:'idle', trick:[], current:-1, leader:-1, trickNo:1,
     cardsPer: count===3?17:13, handNo:0, over:false, scoringMode:selectedScoring
   };
-  var names=['You'].concat(AI_NAMES[count]);
+  var names=[];
+  for(var ni=0;ni<count;ni++) names.push(playerNameFor(count,ni));
   for(var i=0;i<count;i++) G.players.push({name:names[i], human:i===0, hand:[], bid:null, tricks:0, score:0});
   setGameActive(true);
   $('startScreen').classList.remove('on');
@@ -645,7 +757,7 @@ function startGame(count){
   toast('New game — '+SCORING_NAMES[selectedScoring]+', first to 35. Good luck ♠');
 }
 function backToStart(){
-  epoch++; G=null; setGameActive(false); closeAll();
+  epoch++; G=null; clearSave(); setGameActive(false); closeAll();
   $('gameScreen').classList.remove('on');
   $('startScreen').classList.add('on');
   renderScores();
@@ -709,33 +821,40 @@ function nextBid(){
     return;
   }
   var idx=G.bidQueue.shift(); G.current=idx; renderAll();
-  if(G.players[idx].human){
-    $('bidContext').textContent='Hand '+G.handNo+' · You have '+G.players[0].hand.length+' cards. '+(G.count===4?'Your partner Nate bids too — your bids combine. ':'')+'How many tricks will you take?';
-    var grid=$('bidGrid'); grid.innerHTML='';
-    for(var b=0;b<=G.cardsPer;b++){
-      (function(bid){
-        var btn=document.createElement('button');
-        btn.textContent=bid===0?'Nil':String(bid);
-        if(bid===0) btn.className='nil';
-        btn.setAttribute('aria-label', bid===0?'Bid Nil (zero tricks)':'Bid '+bid);
-        btn.addEventListener('click',function(){
-          G.players[0].bid=bid; beep(660,0.06,0.05);
-          $('bidOverlay').classList.remove('on');
-          renderAll(); nextBid();
-        });
-        grid.appendChild(btn);
-      })(b);
-    }
-    $('bidOverlay').classList.add('on');
-  } else {
-    var myEpoch=epoch;
-    setTimeout(function(){
-      if(myEpoch!==epoch||!G) return;
-      G.players[idx].bid=aiBid(G.players[idx]);
-      setMsg('<b>'+G.players[idx].name+'</b> bids '+(G.players[idx].bid===0?'<b>Nil</b>':'<b>'+G.players[idx].bid+'</b>')+'.');
-      renderAll(); nextBid();
-    }, 620);
+  takeBid(idx);
+}
+/* One player places their bid: the human gets the bid sheet, an AI
+   player bids after a short pause. Also used when a saved game is
+   reopened mid-bidding, to pick the bidding back up where it stopped. */
+function takeBid(idx){
+  if(!G||G.phase!=='bidding') return;
+  if(G.players[idx].human){ showBidUI(); return; }
+  var myEpoch=epoch;
+  setTimeout(function(){
+    if(myEpoch!==epoch||!G||G.phase!=='bidding') return;
+    G.players[idx].bid=aiBid(G.players[idx]);
+    setMsg('<b>'+G.players[idx].name+'</b> bids '+(G.players[idx].bid===0?'<b>Nil</b>':'<b>'+G.players[idx].bid+'</b>')+'.');
+    renderAll(); nextBid();
+  }, 620);
+}
+function showBidUI(){
+  $('bidContext').textContent='Hand '+G.handNo+' · You have '+G.players[0].hand.length+' cards. '+(G.count===4?'Your partner '+G.players[2].name+' bids too — your bids combine. ':'')+'How many tricks will you take?';
+  var grid=$('bidGrid'); grid.innerHTML='';
+  for(var b=0;b<=G.cardsPer;b++){
+    (function(bid){
+      var btn=document.createElement('button');
+      btn.textContent=bid===0?'Nil':String(bid);
+      if(bid===0) btn.className='nil';
+      btn.setAttribute('aria-label', bid===0?'Bid Nil (zero tricks)':'Bid '+bid);
+      btn.addEventListener('click',function(){
+        G.players[0].bid=bid; beep(660,0.06,0.05);
+        $('bidOverlay').classList.remove('on');
+        renderAll(); nextBid();
+      });
+      grid.appendChild(btn);
+    })(b);
   }
+  $('bidOverlay').classList.add('on');
 }
 
 /* ================= AI ================= */
@@ -838,7 +957,7 @@ function playCard(pIdx, card){
   if(G.trick.length===1){
     /* A lead card starts a new trick: replace the previous trick's
        announcement right away, so it never lingers over this trick. */
-    setMsg(pIdx===0 ? 'You lead trick '+G.trickNo+'.' : '<b>'+G.players[pIdx].name+'</b> leads trick '+G.trickNo+'.');
+    setMsg('<b>'+G.players[pIdx].name+'</b> leads trick '+G.trickNo+'.');
   }
   if(G.trick.length===G.count){
     /* Announce the winner NOW, while the finished trick is still on the
@@ -851,20 +970,24 @@ function playCard(pIdx, card){
     setMsg('<b>'+G.players[wNow].name+'</b> takes trick '+G.trickNo+'.');
     renderAll();
     var myEpoch=epoch;
-    setTimeout(function(){
-      if(myEpoch!==epoch||!G) return;
-      var w=G.trick[trickWinnerIdx(G.trick)].p;
-      G.players[w].tricks++;
-      G.trick=[]; G.trickNo++; G.leader=w; G.current=w; G.phase='playing';
-      renderAll();
-      if(G.players[0].hand.length===0){ endHand(); return; }
-      setMsg(w===0 ? 'You took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+G.players[w].name+'</b> leads trick '+G.trickNo+'.');
-      scheduleAI();
-    }, 1250);
+    setTimeout(function(){ if(myEpoch===epoch) finishTrick(); }, 1250);
   } else {
     G.current=(pIdx+1)%G.count;
     renderAll(); scheduleAI();
   }
+}
+/* Settle a finished trick: score it, clear the table, and hand the lead
+   to the winner. Runs on a timer after the last card lands, and again
+   when a saved game is reopened with a finished trick on the table. */
+function finishTrick(){
+  if(!G||G.phase!=='trickEnd'||G.trick.length===0) return;
+  var w=G.trick[trickWinnerIdx(G.trick)].p;
+  G.players[w].tricks++;
+  G.trick=[]; G.trickNo++; G.leader=w; G.current=w; G.phase='playing';
+  renderAll();
+  if(G.players[0].hand.length===0){ endHand(); return; }
+  setMsg(w===0 ? '<b>'+G.players[0].name+'</b> took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+G.players[w].name+'</b> leads trick '+G.trickNo+'.');
+  scheduleAI();
 }
 function endHand(){
   G.phase='scoring';
@@ -984,8 +1107,8 @@ function renderAll(){
     }
     handEl.appendChild(b);
   });
-  $('handInfo').textContent='Your hand — Bid: '+(G.players[0].bid===null?'…':(G.players[0].bid===0?'Nil':G.players[0].bid))+' · Tricks won: '+G.players[0].tricks+(G.dealer===0?' · You dealt':'');
-  $('trickInfo').textContent = G.phase==='playing' ? ('Trick '+G.trickNo+' of '+G.cardsPer+(myTurn?' · YOUR TURN':' · waiting on '+G.players[G.current].name)) : (G.phase==='bidding'?'Bidding…':(G.phase==='review'?'Review your hand — no rush':''));
+  $('handInfo').textContent=(G.players[0].name==='You'?'Your hand':G.players[0].name+'’s hand')+' — Bid: '+(G.players[0].bid===null?'…':(G.players[0].bid===0?'Nil':G.players[0].bid))+' · Tricks won: '+G.players[0].tricks+(G.dealer===0?' · '+G.players[0].name+' dealt':'');
+  $('trickInfo').textContent = G.phase==='playing' ? ('Trick '+G.trickNo+' of '+G.cardsPer+(myTurn?' · '+G.players[0].name+' to play':' · waiting on '+G.players[G.current].name)) : (G.phase==='bidding'?'Bidding…':(G.phase==='review'?'Review your hand — no rush':''));
   /* Review step: show the Ready bar only while the player is looking
      over a fresh hand, and fill in a quick count to help plan the bid. */
   var rb=$('reviewBar');
@@ -994,10 +1117,13 @@ function renderAll(){
     rb.hidden = !inReview;
     if(inReview) $('reviewSummary').textContent = handSummaryText();
   }
+  /* Autosave: every render reflects the latest state, so the game is
+     always saved exactly as it stands. */
+  saveGame();
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay'].forEach(function(id){ $(id).classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay'].forEach(function(id){ $(id).classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
@@ -1020,7 +1146,7 @@ $('closeHowBtn').addEventListener('click',closeAll);
 $('installBtn1').addEventListener('click',onInstallTap);
 $('installBtn2').addEventListener('click',onInstallTap);
 $('closeInstallBtn').addEventListener('click',closeAll);
-$('soundBtn').addEventListener('click',function(){ soundOn=!soundOn; $('soundHint').textContent=soundOn?'on':'off'; if(soundOn) sndWin(); });
+$('soundBtn').addEventListener('click',function(){ soundOn=!soundOn; $('soundHint').textContent=soundOn?'on':'off'; saveSettings(); if(soundOn) sndWin(); });
 /* ================= Deck styles ================= */
 var DECK_NAMES={classic:'Classic', ornate:'Ornate Gold', plain:'Plain', midnight:'Midnight'};
 var currentDeck='classic';
@@ -1034,9 +1160,53 @@ function setDeck(name, silent){
 }
 $('deckBtn').addEventListener('click',function(){ closeAll(); $('deckOverlay').classList.add('on'); });
 $('closeDeckBtn').addEventListener('click',closeAll);
+/* ================= Player names ================= */
+function nameField(label, value, placeholder, id){
+  var wrap=document.createElement('div'); wrap.className='name-field';
+  var lab=document.createElement('label'); lab.setAttribute('for', id); lab.textContent=label;
+  var inp=document.createElement('input');
+  inp.id=id; inp.type='text'; inp.value=value; inp.placeholder=placeholder; inp.maxLength=14; inp.setAttribute('autocomplete','off');
+  wrap.appendChild(lab); wrap.appendChild(inp);
+  return wrap;
+}
+function openNames(){
+  closeAll();
+  var f=$('namesForm'); f.innerHTML='';
+  f.appendChild(nameField('Your name — shown on the table, the scoreboard and in announcements', customNames.you, 'You', 'nm-you'));
+  [2,3,4].forEach(function(count){
+    var h=document.createElement('h3'); h.textContent=count+'-player table'; f.appendChild(h);
+    AI_NAMES[count].forEach(function(def,i){
+      var role = (count===4 && i===1) ? ' — your partner' : ' — opponent';
+      f.appendChild(nameField(def+role, customNames.ai[count][i]||'', def, 'nm-'+count+'-'+i));
+    });
+  });
+  $('namesOverlay').classList.add('on');
+}
+$('namesBtn').addEventListener('click', openNames);
+$('namesBtn1').addEventListener('click', openNames);
+$('closeNamesBtn').addEventListener('click', closeAll);
+$('saveNamesBtn').addEventListener('click', function(){
+  customNames.you=cleanName($('nm-you').value);
+  [2,3,4].forEach(function(count){
+    AI_NAMES[count].forEach(function(def,i){
+      var v=cleanName($('nm-'+count+'-'+i).value);
+      customNames.ai[count][i] = (v===def) ? '' : v;
+    });
+  });
+  /* Renaming mid-game updates the table that's already dealt. */
+  if(G){
+    for(var i=0;i<G.count;i++) G.players[i].name=playerNameFor(G.count,i);
+    renderAll();
+  }
+  saveSettings();
+  closeAll();
+  beep(700,0.06,0.05);
+  toast('Names saved — see you at the table, '+playerNameFor(G?G.count:selectedCount,0)+' ♠');
+});
 document.querySelectorAll('.deck-option').forEach(function(btn){
   btn.addEventListener('click',function(){
     setDeck(btn.getAttribute('data-deck-choice'));
+    saveSettings();
     closeAll();
     if(G) renderAll();
   });
@@ -1052,6 +1222,7 @@ document.querySelectorAll('#countSeg button').forEach(function(btn){
     btn.classList.add('sel');
     selectedCount=parseInt(btn.getAttribute('data-n'),10);
     $('countExplain').textContent=EXPLAINS[selectedCount];
+    saveSettings();
     beep(600,0.05,0.04);
   });
 });
@@ -1059,6 +1230,7 @@ document.querySelectorAll('#countSeg button').forEach(function(btn){
 document.querySelectorAll('#scoreSeg button').forEach(function(btn){
   btn.addEventListener('click',function(){
     setScoringMode(btn.getAttribute('data-mode'));
+    saveSettings();
     beep(600,0.05,0.04);
   });
 });
@@ -1066,6 +1238,7 @@ $('scoreModeBtn').addEventListener('click',function(){
   /* Toggle between the two modes; applies to the current game from the next hand scored, and to the next new game. */
   var next = scoringMode()==='bid' ? 'standard' : 'bid';
   setScoringMode(next);
+  saveSettings();
   beep(600,0.05,0.04);
   if(G) renderScores();
 });
@@ -1074,6 +1247,9 @@ $('dealBtn').addEventListener('click',function(){ startGame(selectedCount); });
 $('readyBidBtn').addEventListener('click',function(){ startBidding(); });
 updateWakeUI();
 renderScores();
+/* Restore remembered settings, then pick up a saved game if there is one. */
+loadSettings();
+loadSavedGame();
 </script>
 </body>
 </html>
