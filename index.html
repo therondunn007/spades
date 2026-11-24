@@ -244,6 +244,13 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .mp-replace-bar{display:grid;gap:8px;margin-top:8px}
 .mp-replace-bar:empty{display:none}
 .mp-replace-bar button{padding:11px;border-radius:11px;background:#7a4a12;color:#ffe9bd;border:1px solid #c98a2d;font-size:15px;text-align:left}
+.mp-joinreq-bar{display:grid;gap:8px;margin-top:8px}
+.mp-joinreq-bar:empty{display:none}
+.mp-joinreq{background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.5);border-radius:11px;padding:10px 11px;font-family:Verdana,sans-serif;font-size:13.5px;line-height:1.5;color:var(--text)}
+.mp-joinreq-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.mp-joinreq-btns button{flex:1;padding:10px;border-radius:10px;font-size:15px;font-weight:bold;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--text)}
+.mp-joinreq-btns button.accept{background:var(--gold);color:#231a02;border:none}
+.mp-joinreq-btns button:active{transform:scale(.97)}
 </style>
 </head>
 <body data-deck="classic">
@@ -298,6 +305,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       </div>
       <div class="mp-away-banner" id="mpAwayBanner" role="status"></div>
       <div class="mp-replace-bar" id="mpReplaceBar"></div>
+      <div class="mp-joinreq-bar" id="mpJoinReqBar"></div>
     </div>
     <div class="table-zone">
       <div class="opponents" id="opponents"></div>
@@ -466,6 +474,9 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <input class="mp-input" id="mpJoinInput" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code">
     <button class="big-btn" id="mpJoinBtn">Join table</button>
     <p class="mp-status" id="mpStatus" role="status"></p>
+    <button class="big-btn" id="mpCancelReqBtn" style="display:none">Cancel join request</button>
+    <button class="ghost-btn" id="mpInstallBtn">⬇ Install the game — add to home screen</button>
+    <p class="small muted" style="text-align:center;margin:2px 0 0">New here? Spades plays right in your browser — installing just adds its ♠ icon to your home screen so it opens like an app.</p>
     <button class="ghost-btn" id="mpCloseBtn">Back</button>
   </div>
 </div>
@@ -481,6 +492,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <p class="small muted" style="text-align:center;margin:7px 0 0">Opens your phone's share sheet — pick a contact, Messages, or any app to send the join link.</p>
     <a class="ghost-btn" id="lobbySmsBtn" href="#">💬 Text the invite instead</a>
     <button class="ghost-btn" id="lobbyCopyBtn">Copy the join link</button>
+    <button class="ghost-btn" id="lobbyInstallBtn">⬇ Install the game — add to home screen</button>
     <p class="small muted" style="text-align:center;margin:9px 0 0">If someone's phone closes or loses signal mid-game, their seat waits for them — reopening the game puts them straight back in their seat with their cards.</p>
     <h3 style="margin-top:18px">At this table</h3>
     <div class="mp-players" id="lobbyPlayers"></div>
@@ -846,7 +858,12 @@ function startGame(count){
          from another seat translates its view index to the room's seat. */
       var absSeat=(typeof mpViewToAbs==='function' && MP.mySeat) ? mpViewToAbs(mi) : mi;
       var seatInfo=MP.seats[String(absSeat)];
-      if(seatInfo && seatInfo.uid){
+      /* A mid-game join requester (or someone the host declined) whose
+         claim is still in the room is NOT seated by a fresh game — the
+         host's say-so at the table is what lets a new player in. */
+      var jr=MP.joinRequests ? MP.joinRequests[String(absSeat)] : null;
+      var jrBlocks=seatInfo && ((jr && jr.uid===seatInfo.uid && jr.status!=='approved') || (MP.declinedUids && MP.declinedUids[seatInfo.uid]));
+      if(seatInfo && seatInfo.uid && !jrBlocks){
         /* Remote names are untrusted input from the database — strip any
            markup characters before the name is ever rendered. */
         G.players[mi].name=cleanName(seatInfo.name)||G.players[mi].name;
@@ -872,6 +889,10 @@ function backToStart(){
 }
 function newDeal(){
   if(!G) return;
+  /* Multiplayer host: players let in mid-game take their seats on this
+     deal — before the cards go out, so they're dealt a hand like
+     everyone else. (No-op in solo play and for guests.) */
+  if(typeof mpAdoptApprovedJoins==='function') mpAdoptApprovedJoins();
   var myEpoch=epoch;
   G.handNo++;
   G.dealer=(G.dealer+1)%G.count;
@@ -1287,7 +1308,11 @@ $('howBtn2').addEventListener('click',function(){ closeAll(); $('howOverlay').cl
 $('closeHowBtn').addEventListener('click',closeAll);
 $('installBtn1').addEventListener('click',onInstallTap);
 $('installBtn2').addEventListener('click',onInstallTap);
-$('closeInstallBtn').addEventListener('click',closeAll);
+$('closeInstallBtn').addEventListener('click',function(){
+  closeAll();
+  /* If the install sheet was opened mid-join, return to that screen. */
+  if(typeof mpRestoreJoinUi==='function') mpRestoreJoinUi();
+});
 $('soundBtn').addEventListener('click',function(){ soundOn=!soundOn; $('soundHint').textContent=soundOn?'on':'off'; saveSettings(); if(soundOn) sndWin(); });
 /* ================= Deck styles ================= */
 var DECK_NAMES={classic:'Classic', ornate:'Ornate Gold', plain:'Plain', midnight:'Midnight'};
@@ -1429,7 +1454,12 @@ var MP={
   readyMap:{}, _allReady:false, _readySent:false, _bidShownKey:'',
   _resultShownKey:'', _intentSeq:0, _processedIntents:{}, listeners:[],
   presence:{}, awaySince:{}, hostUid:null, _presenceReady:false,
-  _presenceTimer:null, _uiTimer:null, _takeoverBusy:false, _unknownHands:{}
+  _presenceTimer:null, _uiTimer:null, _takeoverBusy:false, _unknownHands:{},
+  /* Join requests for a game already in progress: the requester claims a
+     free seat in players (their request), the host approves or declines
+     at the table, and the public state carries the answer back. */
+  joinRequests:{}, declinedUids:{}, declineNote:null,
+  joinPending:false, _joinResolved:false
 };
 function mpMyName(){ return playerNameFor(selectedCount,0); }
 /* Seat maths: the game engine always sees the local player at index 0,
@@ -1492,7 +1522,7 @@ function mpSetLobbyStatus(txt){ var s=$('lobbyStatus'); if(s) s.textContent=txt|
    and both are always on screen next to the Invite button. */
 function mpSmsHref(){
   if(!MP.code) return '#';
-  var body='Join my Spades table! Tap this link to sit down: '+mpRoomLink()+' — or open Spades and use table code '+MP.code+'.';
+  var body='Join my Spades table! Tap this link to sit down: '+mpRoomLink()+' — it opens the game in your browser, no install needed to play. New to Spades? That page has an "Install the game" button that puts it on your home screen; after installing, open Spades and join with table code '+MP.code+'.';
   /* sms:?&body= is understood by both iOS and Android messengers. */
   return 'sms:?&body='+encodeURIComponent(body);
 }
@@ -1511,7 +1541,7 @@ function mpInvite(){
   if(navigator.share){
     navigator.share({
       title:'Spades — join my table',
-      text:'Join my Spades table! Tap the link to sit down at table '+MP.code+'.',
+      text:'Join my Spades table! Tap the link to sit down at table '+MP.code+'. It opens in your browser — no install needed to play. If you want the app, that page has an "Install the game" button that adds Spades to your home screen.',
       url:link
     }).then(function(){}, function(err){
       /* The player closing the share sheet is not an error. Anything else:
@@ -1872,7 +1902,16 @@ function mpDetach(){
   MP.listeners=[];
 }
 
-/* ---- Room codes: 4 letters, claimed atomically so hosts can't collide ---- */
+/* ---- Room codes: 4 letters, claimed so hosts can't collide ----
+   The database rules are written per node (meta, players/{seat}, …) and
+   deliberately do not allow reading or writing a whole room in one go —
+   which is why the original one-shot transaction claim was rejected and
+   creating a table always failed. So claim a code the way the rules are
+   written: check the code's meta node is empty (that read is allowed),
+   write the meta and the host's seat, then read meta/hostUid back and
+   confirm this phone really owns the room before using the code. Two
+   hosts racing for the same code in the same second is the only way the
+   verify can fail, and it just retries with a fresh code. */
 function mpGenCode(){
   var letters='ABCDEFGHJKMNPQRSTUVWXYZ'; /* no I, L, O — easy to read aloud */
   var c='';
@@ -1882,16 +1921,26 @@ function mpGenCode(){
 function mpClaimCode(attempt){
   attempt=attempt||0;
   var code=mpGenCode();
+  var ref=MP.db.ref('rooms/'+code);
   var meta={ hostUid:MP.uid, count:selectedCount, scoringMode:selectedScoring, status:'lobby', createdAt:Date.now() };
-  var seed={ meta:meta, players:{} };
-  seed.players['0']={ uid:MP.uid, name:mpMyName() };
-  return MP.db.ref('rooms/'+code).transaction(function(cur){
-    if(cur!==null) return undefined; /* taken — abort and try another code */
-    return seed;
-  }).then(function(res){
-    if(res && res.committed) return code;
-    if(attempt>=7) throw new Error('codes');
-    return mpClaimCode(attempt+1);
+  return ref.child('meta').once('value').then(function(snap){
+    if(snap.val()!==null){
+      if(attempt>=7) throw new Error('codes');
+      return mpClaimCode(attempt+1); /* code already in use — try another */
+    }
+    return ref.child('meta').set(meta).then(function(){
+      return ref.child('players/0').set({ uid:MP.uid, name:mpMyName() });
+    }).then(function(){
+      return ref.child('meta/hostUid').once('value');
+    }).then(function(hs){
+      if(hs.val()!==MP.uid){
+        if(attempt>=7) throw new Error('codes');
+        return mpClaimCode(attempt+1); /* lost a same-second race for this code */
+      }
+      /* Re-write my seat once more, so the room is consistent even if a
+         racing claim touched it between the writes above. */
+      return ref.child('players/0').set({ uid:MP.uid, name:mpMyName() }).then(function(){ return code; });
+    });
   });
 }
 
@@ -1934,6 +1983,15 @@ function mpJoin(code){
         var mySeat=-1;
         Object.keys(players).forEach(function(k){ if(players[k] && players[k].uid===MP.uid) mySeat=parseInt(k,10); });
         var rejoin = mySeat>=0;
+        if(!rejoin && meta.status==='playing'){
+          /* A game is already running at this table: don't turn the
+             visitor away — ask the host for a seat instead. The host
+             sees the request at the table and can let them in (they
+             take a free or computer-filled seat and are dealt in on
+             the next hand) or decline it. */
+          mpRequestJoin(code, ref, meta, players);
+          return;
+        }
         if(!rejoin && meta.status!=='lobby') throw new Error('started');
         if(mySeat<0){
           for(var s=0;s<meta.count;s++){ if(!players[String(s)]){ mySeat=s; break; } }
@@ -1993,6 +2051,191 @@ function mpJoin(code){
   });
 }
 
+/* ---- Joining a game already in progress: request, host decides ----
+   The database rules give every signed-in phone exactly one way to make
+   itself known at a table: writing its own seat entry under players.
+   So a mid-game join request IS a claim on a free (or computer-filled)
+   seat — the host's phone watches players, sees a claim from a uid its
+   game doesn't know, and shows the request at the table with Let in /
+   No room buttons. The answer travels back in the public state the host
+   already publishes (joinAccepted / declinedUid), which every phone can
+   read. Until the host lets them in, the seat keeps being played by the
+   computer; an accepted player is dealt in from the next hand. */
+function mpSetCancelReqVisible(v){ var b=$('mpCancelReqBtn'); if(b) b.style.display=v?'block':'none'; }
+function mpRequestJoin(code, ref, meta, players){
+  var seat=-1;
+  for(var s=0;s<meta.count;s++){ if(!players[String(s)]){ seat=s; break; } }
+  if(seat<0){ mpSetStatus('That table is full — every seat has a player. Ask the host to start a new table when this game ends.'); return; }
+  var entry={}; entry[String(seat)]={ uid:MP.uid, name:mpMyName() };
+  ref.child('players').update(entry).then(function(){
+    MP.code=code; MP.roomRef=ref; MP.meta=meta; MP.hostUid=meta.hostUid||null;
+    MP.mySeat=seat; MP.isHost=false; MP.joinPending=true; MP._joinResolved=false;
+    MP.seats=players; MP.seats[String(seat)]=entry[String(seat)];
+    selectedCount=meta.count;
+    if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
+    mpSetCancelReqVisible(true);
+    mpSetStatus('You asked to join table '+code+' — the host can see your request at the table. Waiting for them to let you in…');
+    mpWatchJoinRequest();
+  }).catch(function(){
+    mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+function mpWatchJoinRequest(){
+  mpListen(mpRef('players'), 'value', function(snap){
+    if(MP._joinResolved || !MP.joinPending) return;
+    MP.seats=snap.val()||{};
+    var mine=MP.seats[String(MP.mySeat)];
+    if(!mine || mine.uid!==MP.uid){
+      /* My claim was overwritten — somebody else took the seat first. */
+      MP._joinResolved=true; MP.joinPending=false;
+      mpSetCancelReqVisible(false);
+      mpSetStatus('That seat was just taken by someone else. Enter the code again to ask for a different seat.');
+    }
+  });
+  mpListen(mpRef('public'), 'value', function(snap){
+    if(MP._joinResolved || !MP.joinPending) return;
+    var pub=snap.val(); if(!pub) return;
+    if(pub.declinedUid && pub.declinedUid===MP.uid){ mpJoinDeclined(); return; }
+    var acc=(pub.joinAccepted && pub.joinAccepted[MP.uid]!==undefined) ? parseInt(pub.joinAccepted[MP.uid],10) : -1;
+    var adoptedSeat=(pub.players && pub.players[MP.mySeat] && pub.players[MP.mySeat].uid===MP.uid);
+    if(acc===MP.mySeat || adoptedSeat) mpJoinAccepted();
+  });
+}
+function mpJoinAccepted(){
+  if(MP._joinResolved) return;
+  MP._joinResolved=true; MP.joinPending=false;
+  MP.active=true;
+  mpSetCancelReqVisible(false);
+  mpSaveSession();
+  mpWatchGuestGame();
+  mpSetupPresence();
+  closeAll();
+  toast('You\'re in! Watch this hand out — you\'re dealt in on the next one ♠');
+}
+function mpJoinDeclined(){
+  if(MP._joinResolved) return;
+  MP._joinResolved=true; MP.joinPending=false;
+  if(MP.roomRef && MP.mySeat>=0) mpRef('players/'+MP.mySeat).set(null).catch(function(){});
+  mpDetach();
+  MP.code=null; MP.roomRef=null; MP.mySeat=-1; MP.seats=null; MP.meta=null; MP.hostUid=null;
+  mpSetCancelReqVisible(false);
+  mpSetStatus('The host couldn\'t add you to this game. Ask them for a fresh table when it ends — or play solo in the meantime.');
+  toast('The host said there\'s no room at this table right now.');
+}
+function mpCancelJoinRequest(silent){
+  if(!MP.joinPending) return;
+  MP._joinResolved=true; MP.joinPending=false;
+  if(MP.roomRef && MP.mySeat>=0) mpRef('players/'+MP.mySeat).set(null).catch(function(){});
+  mpDetach();
+  MP.code=null; MP.roomRef=null; MP.mySeat=-1; MP.seats=null; MP.meta=null; MP.hostUid=null;
+  mpSetCancelReqVisible(false);
+  if(!silent) mpSetStatus('');
+}
+/* If the install sheet was opened from the join screen (a first-time
+   visitor adding the game to their home screen before sitting down),
+   closing it returns to the waiting-for-the-host screen rather than
+   stranding them on the start screen while their request is live. */
+function mpRestoreJoinUi(){
+  if(MP.joinPending && MP.code){
+    $('mpOverlay').classList.add('on');
+    mpSetCancelReqVisible(true);
+    mpSetStatus('You asked to join table '+MP.code+' — the host can see your request at the table. Waiting for them to let you in…');
+  }
+}
+
+/* ---- Host side of a join request: see it, decide, seat them ---- */
+function mpHostCheckJoinRequests(){
+  if(!MP.active || !MP.isHost || !G || !MP.seats) return;
+  if(!MP.meta || MP.meta.status!=='playing') return;
+  /* Forget requests whose claim has gone (cancelled, or the seat was
+     taken by someone else) — approved ones stay until they are seated. */
+  Object.keys(MP.joinRequests).forEach(function(k){
+    var r=MP.joinRequests[k];
+    var info=MP.seats[k];
+    if(r.status!=='approved' && (!info || info.uid!==r.uid)) delete MP.joinRequests[k];
+  });
+  var count=mpTableCount();
+  for(var s=0;s<count;s++){
+    var info=MP.seats[String(s)];
+    if(!info || !info.uid || info.uid===MP.uid) continue;
+    var gp=G.players[mpAbsToView(s)];
+    if(gp && gp.uid===info.uid) continue; /* already a player in this game */
+    if(MP.declinedUids[info.uid]) continue; /* already said no to this phone */
+    var cur=MP.joinRequests[String(s)];
+    if(cur && cur.uid===info.uid) continue; /* already on screen */
+    MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'pending' };
+    toast((cleanName(info.name)||'A player')+' wants to join your table ♠');
+    try{ beep(880,0.09,0.05); }catch(e){}
+  }
+  mpRenderJoinRequests();
+}
+function mpRenderJoinRequests(){
+  var bar=$('mpJoinReqBar'); if(!bar) return;
+  bar.innerHTML='';
+  Object.keys(MP.joinRequests).forEach(function(k){
+    var r=MP.joinRequests[k];
+    if(!r || r.status!=='pending') return;
+    var seat=parseInt(k,10);
+    var div=document.createElement('div');
+    div.className='mp-joinreq';
+    var txt=document.createElement('div');
+    var nm=document.createElement('b'); nm.textContent=r.name;
+    txt.appendChild(nm);
+    txt.appendChild(document.createTextNode(' wants to join this game. Seat '+(seat+1)+' is open (the computer is playing it) — let them in and they\'re dealt in from the next hand.'));
+    div.appendChild(txt);
+    var btns=document.createElement('div');
+    btns.className='mp-joinreq-btns';
+    var yes=document.createElement('button');
+    yes.type='button'; yes.className='accept'; yes.textContent='✓ Let them in';
+    yes.addEventListener('click', function(){ mpAcceptJoin(seat); });
+    var no=document.createElement('button');
+    no.type='button'; no.textContent='No room';
+    no.addEventListener('click', function(){ mpDeclineJoin(seat); });
+    btns.appendChild(yes); btns.appendChild(no);
+    div.appendChild(btns);
+    bar.appendChild(div);
+  });
+}
+function mpAcceptJoin(absSeat){
+  var r=MP.joinRequests[String(absSeat)];
+  if(!r) return;
+  r.status='approved';
+  mpHostSync(); /* publish the acceptance in the public state at once */
+  mpRenderJoinRequests();
+  toast(r.name+' is in — they\'ll be dealt in on the next hand ♠');
+}
+function mpDeclineJoin(absSeat){
+  var r=MP.joinRequests[String(absSeat)];
+  if(!r) return;
+  r.status='declined';
+  MP.declinedUids[r.uid]=true;
+  MP.declineNote={ uid:r.uid, at:Date.now() };
+  mpHostSync(); /* the public state carries the no back to their phone */
+  mpRenderJoinRequests();
+  toast('You let '+r.name+' know there\'s no room this game.');
+}
+/* Called by the host's newDeal before the cards go out: anyone the host
+   let in takes their seat for real — their name and phone replace the
+   computer at that seat, and the normal host sync deals them their
+   private hand like every other friend at the table. */
+function mpAdoptApprovedJoins(){
+  if(!MP.active || !MP.isHost || !G) return;
+  Object.keys(MP.joinRequests).forEach(function(k){
+    var r=MP.joinRequests[k];
+    if(!r || r.status!=='approved') return;
+    var absSeat=parseInt(k,10);
+    var info=MP.seats ? MP.seats[k] : null;
+    if(!info || info.uid!==r.uid){ delete MP.joinRequests[k]; return; } /* claim vanished — nothing to seat */
+    var v=mpAbsToView(absSeat);
+    var p=G.players[v];
+    if(p){
+      p.name=cleanName(info.name)||p.name;
+      p.uid=r.uid; p.human=true; p.remote=(r.uid!==MP.uid);
+    }
+    delete MP.joinRequests[k];
+  });
+}
+
 /* ---- Lobby ---- */
 function mpEnterLobby(){
   closeAll();
@@ -2043,6 +2286,8 @@ function mpWatchLobby(){
       if(MP.seats[k]) MP.seats[k].name=cleanName(MP.seats[k].name||'')||'Player';
     });
     if($('lobbyOverlay').classList.contains('on')) mpRenderLobby();
+    /* Mid-game, a players entry the game doesn't know is a join request. */
+    mpHostCheckJoinRequests();
   });
   mpListen(mpRef('meta/status'), 'value', function(snap){
     if(snap.val()==='playing' && MP.meta) MP.meta.status='playing';
@@ -2101,6 +2346,19 @@ function mpPublicState(){
   if(G.phase==='scoring'){
     pub.result={ title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:'Waiting for the host…' };
   }
+  /* Join-request answers ride in the public state: who was let in (and
+     at which seat), and — briefly — who was told there's no room, so
+     their phone can stop waiting and free the seat claim. */
+  var ja={};
+  Object.keys(MP.joinRequests||{}).forEach(function(k){
+    var r=MP.joinRequests[k];
+    if(r && r.status==='approved') ja[r.uid]=parseInt(k,10);
+  });
+  pub.joinAccepted=ja;
+  if(MP.declineNote && (Date.now()-MP.declineNote.at)<120000){
+    pub.declinedUid=MP.declineNote.uid;
+    pub.declinedAt=MP.declineNote.at;
+  }
   return pub;
 }
 function mpHostSync(){
@@ -2140,10 +2398,18 @@ var mpReadyListening=false;
 function mpListenReady(){
   if(mpReadyListening || !MP.isHost) return;
   mpReadyListening=true;
-  mpListen(mpRef('ready'), 'value', function(snap){
-    MP.readyMap=snap.val()||{};
-    mpCheckReady();
-  });
+  /* The database rules let the host read each seat's Ready tap, not the
+     ready node as a whole — so listen seat by seat and merge them into
+     the one map, exactly as the whole-node listener used to. */
+  for(var s=0;s<mpTableCount();s++){
+    (function(seat){
+      mpListen(mpRef('ready/'+seat), 'value', function(snap){
+        if(snap.val()===null) delete MP.readyMap[String(seat)];
+        else MP.readyMap[String(seat)]=snap.val();
+        mpCheckReady();
+      });
+    })(s);
+  }
 }
 function mpHumanSeats(){
   var out=[];
@@ -2173,17 +2439,23 @@ function mpHostReady(){
   mpListenReady();
   mpCheckReady();
 }
+var mpIntentsListening=false;
 function mpWatchHostIntents(){
-  mpListen(mpRef('intents'), 'value', function(snap){
-    var all=snap.val()||{};
-    Object.keys(all).forEach(function(seatKey){
-      var intent=all[seatKey];
-      if(!intent || !intent.id || MP._processedIntents[intent.id]) return;
-      MP._processedIntents[intent.id]=true;
-      mpRef('intents/'+seatKey).set(null).catch(function(){});
-      mpApplyIntent(parseInt(seatKey,10), intent);
-    });
-  });
+  if(mpIntentsListening) { mpListenReady(); return; }
+  mpIntentsListening=true;
+  /* Same rules shape as Ready: the host may read each seat's intent
+     node, not the intents node as a whole — listen seat by seat. */
+  for(var s=0;s<mpTableCount();s++){
+    (function(seat){
+      mpListen(mpRef('intents/'+seat), 'value', function(snap){
+        var intent=snap.val();
+        if(!intent || !intent.id || MP._processedIntents[intent.id]) return;
+        MP._processedIntents[intent.id]=true;
+        mpRef('intents/'+seat).set(null).catch(function(){});
+        mpApplyIntent(seat, intent);
+      });
+    })(s);
+  }
   mpListenReady();
 }
 function mpApplyIntent(absSeat, intent){
@@ -2211,8 +2483,10 @@ function mpSendIntent(intent){
   if(!MP.roomRef) return;
   intent.id=MP.uid+'-'+Date.now()+'-'+(++MP._intentSeq);
   intent.seat=MP.mySeat;
-  var w={}; w[String(MP.mySeat)]=intent;
-  mpRef('intents').update(w).catch(function(){ toast('That move did not reach the table — check your connection.'); });
+  /* Write the intent at my own seat's node — the write the database
+     rules are shaped for (they check it against the table state: the
+     move only lands when it really is this seat's turn). */
+  mpRef('intents/'+MP.mySeat).set(intent).catch(function(){ toast('That move did not reach the table — check your connection.'); });
 }
 function mpGuestReady(){
   if(MP._readySent || !MP.roomRef || !G) return;
@@ -2300,6 +2574,9 @@ function mpApplyPublic(pub){
 
 /* ---- Leaving ---- */
 function mpLeaveTable(){
+  /* A player still waiting on a join request just takes their claim
+     back — there's no seat or hand to tidy up yet. */
+  if(MP.joinPending){ mpCancelJoinRequest(true); return; }
   try{
     if(MP.roomRef && MP.mySeat>=0){
       /* Leaving on purpose is not "away": drop the presence heartbeat so
@@ -2320,7 +2597,9 @@ function mpLeaveTable(){
   MP.active=false; MP.isHost=false; MP.code=null; MP.mySeat=-1; MP.seats=null;
   MP.lastPub=null; MP.lastPubJson=''; MP.lastHandsJson=''; MP.lastBackupJson=''; MP._readySent=false; MP._allReady=false;
   MP.presence={}; MP.awaySince={}; MP.hostUid=null; MP._presenceReady=false; MP._takeoverBusy=false; MP._unknownHands={};
-  mpReadyListening=false;
+  MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
+  mpSetCancelReqVisible(false);
+  mpReadyListening=false; mpIntentsListening=false;
   var bar=$('mpBar'); if(bar) bar.hidden=true;
 }
 
@@ -2333,7 +2612,18 @@ $('mpBtn').addEventListener('click', function(){
   mpSetStatus('');
   $('mpOverlay').classList.add('on');
 });
-$('mpCloseBtn').addEventListener('click', closeAll);
+$('mpCloseBtn').addEventListener('click', function(){
+  /* Backing out while a join request is waiting cancels the request —
+     the host shouldn't be left deciding on someone who already left. */
+  if(MP.joinPending) mpCancelJoinRequest(true);
+  closeAll();
+});
+$('mpCancelReqBtn').addEventListener('click', function(){
+  mpCancelJoinRequest(false);
+  toast('Join request cancelled.');
+});
+$('mpInstallBtn').addEventListener('click', onInstallTap);
+$('lobbyInstallBtn').addEventListener('click', onInstallTap);
 document.querySelectorAll('#mpCountSeg button').forEach(function(btn){
   btn.addEventListener('click', function(){
     document.querySelectorAll('#mpCountSeg button').forEach(function(b){ b.classList.remove('sel'); });
@@ -2386,7 +2676,7 @@ $('lobbyCopyBtn').addEventListener('click', function(){
       /* If the table is gone (finished, or the seat was replaced after a
          long absence), don't strand the player on this sheet. */
       setTimeout(function(){
-        if(!MP.active){
+        if(!MP.active && !MP.joinPending){
           mpClearSession();
           closeAll();
           toast('That table has finished — start or join a new one ♠');
