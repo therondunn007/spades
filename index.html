@@ -604,7 +604,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 <div class="overlay" id="notifyOverlay" role="dialog" aria-modal="true" aria-label="Table notifications">
   <div class="sheet">
     <h2>🔔 Table notifications</h2>
-    <p class="small muted">Get a pop-up when someone joins your table — even if the app is closed. Tap the pop-up and you're taken straight to the table.</p>
+    <p class="small muted">Works even when the app is closed — tap the pop-up to jump straight to the table.</p>
     <button class="big-btn" id="notifyAllowBtn">Allow notifications</button>
     <button class="ghost-btn" id="notifyLaterBtn">Not now</button>
     <p class="small muted" style="text-align:center;margin:9px 0 0">You can turn this on or off any time in Menu → Table notifications.</p>
@@ -2208,6 +2208,7 @@ function mpAskJoinAs(meta, players, cb){
   var hostSeat=mpHostSeatOf(meta, players);
   var hostInfo=players[String(hostSeat)];
   var hostName=hostInfo ? (cleanName(hostInfo.name)||'the host') : 'the host';
+  if(hostName==='You') hostName='the host';
   var sub=$('joinAsSub');
   if(sub) sub.textContent='This is '+hostName+'\'s partners table. Sit across from '+hostName+' as their teammate, or beside them as an opponent. If the seat you pick was just taken, you\'ll get the other open seat.';
   var team=$('joinAsTeamBtn'); if(team) team.textContent='🤝 Teammate — sit across from '+hostName;
