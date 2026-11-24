@@ -251,6 +251,24 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .mp-joinreq-btns button{flex:1;padding:10px;border-radius:10px;font-size:15px;font-weight:bold;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--text)}
 .mp-joinreq-btns button.accept{background:var(--gold);color:#231a02;border:none}
 .mp-joinreq-btns button:active{transform:scale(.97)}
+/* ---------- Friends by handle ---------- */
+.fr-row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:11px 13px;font-size:16px;margin-top:8px}
+.fr-row .who{min-width:0}
+.fr-row .who b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr-row .who .tag{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted)}
+.fr-row button{flex:none;padding:9px 13px;border-radius:10px;font-size:14.5px;font-weight:bold;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--text)}
+.fr-row button.accept{background:var(--gold);color:#231a02;border:none}
+.fr-row button:active{transform:scale(.97)}
+.fr-row button[disabled]{opacity:.45}
+.fr-input{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.3);color:var(--text);font-size:18px;font-family:inherit}
+.fr-status{font-family:Verdana,sans-serif;font-size:13px;color:var(--muted);line-height:1.6;min-height:20px;margin-top:8px}
+.fr-banner{background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.55);border-radius:14px;padding:12px 14px;margin:10px 0;font-family:Verdana,sans-serif;font-size:14px;line-height:1.55}
+.fr-banner[hidden]{display:none !important}
+.fr-banner .fr-banner-btns{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+.fr-banner .fr-banner-btns button{flex:1;padding:10px;border-radius:10px;font-size:15px;font-weight:bold;border:1px solid rgba(255,255,255,.25);background:transparent;color:var(--text)}
+.fr-banner .fr-banner-btns button.accept{background:var(--gold);color:#231a02;border:none}
+.fr-directory{max-height:264px;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:2px 10px 10px;margin-top:8px;background:rgba(0,0,0,.18)}
+.fr-directory .fr-row{background:rgba(0,0,0,.32)}
 </style>
 </head>
 <body data-deck="classic">
@@ -266,6 +284,9 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
   </div>
 
   <div class="scores" id="scoreStrip" aria-live="polite"></div>
+
+  <!-- In-app table invite notice (friends by handle) -->
+  <div class="fr-banner" id="frInviteBanner" hidden></div>
 
   <!-- ============ START SCREEN ============ -->
   <section class="screen on" id="startScreen">
@@ -289,6 +310,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button class="big-btn" id="dealBtn">Shuffle &amp; deal</button>
       <button class="big-btn friends-btn" id="mpBtn">👥 Play with friends — live multiplayer</button>
       <p class="small muted" style="text-align:center;margin:8px 0 0">Create a table, share the 4-letter code, and play live against friends on their own phones. Empty seats are filled by the computer.</p>
+      <button class="ghost-btn" id="friendsBtn1">👥 Friends — add players by game name <span class="fr-badge"></span></button>
+      <p class="small muted" style="text-align:center;margin:8px 0 0">Pick a unique game name, add friends by theirs, and invite them to your table right inside the game — no phone number needed.</p>
       <button class="ghost-btn" id="howBtn1">How to play &amp; scoring</button>
       <button class="ghost-btn" id="installBtn1">⬇ Install app — add to home screen</button>
       <button class="ghost-btn" id="namesBtn1">✎ Player names</button>
@@ -301,6 +324,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <div class="mp-bar-row">
         <span class="mp-bar-info" id="mpBarInfo"></span>
         <button class="mp-bar-btn" id="mpInviteBtn2" type="button">📤 Invite</button>
+        <button class="mp-bar-btn" id="mpFriendsBtn" type="button" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);font-weight:normal">👥 Friends <span class="fr-badge"></span></button>
         <a class="mp-bar-btn" id="mpSmsBtn2" href="#">💬 Text invite</a>
       </div>
       <div class="mp-away-banner" id="mpAwayBanner" role="status"></div>
@@ -336,6 +360,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button id="setupBtn"><span>♠ New table setup</span><span class="hint">change player count</span></button>
       <button id="deckBtn"><span>🃏 Card deck</span><span class="hint" id="deckHint">Classic</span></button>
       <button id="namesBtn"><span>✎ Player names</span><span class="hint">yours + the table's</span></button>
+      <button id="friendsBtn2"><span>👥 Friends</span><span class="hint">add by game name · <span class="fr-badge">invite in the app</span></span></button>
       <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
       <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
       <button id="soundBtn"><span>🔊 Sound</span><span class="hint" id="soundHint">on</span></button>
@@ -469,6 +494,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button data-mode="standard"><span class="n" style="font-size:17px">Standard</span></button>
     </div>
     <button class="big-btn" id="mpCreateBtn">Create table &amp; get my code</button>
+    <button class="ghost-btn" id="mpFriendsBtn2">👥 Friends — invite by game name instead <span class="fr-badge"></span></button>
+    <p class="small muted" style="text-align:center;margin:2px 0 0">Friends you add by their game name get the invite inside their game — no phone number or text needed.</p>
     <h3 style="margin-top:22px">Join a table</h3>
     <p class="small muted">Type the 4-letter code your friend gave you:</p>
     <input class="mp-input" id="mpJoinInput" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code">
@@ -496,9 +523,55 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <p class="small muted" style="text-align:center;margin:9px 0 0">If someone's phone closes or loses signal mid-game, their seat waits for them — reopening the game puts them straight back in their seat with their cards.</p>
     <h3 style="margin-top:18px">At this table</h3>
     <div class="mp-players" id="lobbyPlayers"></div>
+    <h3 style="margin-top:18px">Invite a friend in the app</h3>
+    <p class="small muted" style="margin:2px 0 0">Friends added by game name get the invite inside their game — they tap Join and land at this table.</p>
+    <div id="lobbyFriends"><p class="small muted">Open Friends once (start screen or Menu) to load your friends list here.</p></div>
     <p class="mp-status" id="lobbyStatus" role="status"></p>
     <button class="big-btn" id="lobbyStartBtn" style="display:none">Start the game</button>
     <button class="ghost-btn" id="lobbyLeaveBtn">Leave table</button>
+  </div>
+</div>
+
+<!-- ============ FRIENDS BY HANDLE ============ -->
+<div class="overlay" id="friendsOverlay" role="dialog" aria-modal="true" aria-label="Friends">
+  <div class="sheet">
+    <h2>Friends</h2>
+    <p class="small muted">Add players by their <b>game name</b> and invite them to your table right inside the game — no phone number, no texting. They see the invite in their own game and can accept or decline it there.</p>
+
+    <h3>Your game name</h3>
+    <p class="small muted" style="margin:2px 0 8px">This is the name friends type to find you. It's <b>unique</b> — the first player to claim a name keeps it. Letters, numbers and underscores, 3–16 characters.</p>
+    <input class="fr-input" id="frHandleInput" maxlength="16" placeholder="e.g. theron_7" autocomplete="off" autocapitalize="none" aria-label="Your game name">
+    <button class="big-btn" id="frClaimBtn">Claim / change my game name</button>
+    <p class="fr-status" id="frHandleStatus" role="status"></p>
+
+    <h3>Find a player — search game names</h3>
+    <p class="small muted" style="margin:2px 0 8px">Don't know their exact name? Type part of it and pick from the players who have claimed a game name. Tapping a result sends them a friend request.</p>
+    <input class="fr-input" id="frSearchInput" maxlength="16" placeholder="Search game names…" autocomplete="off" autocapitalize="none" aria-label="Search game names">
+    <div id="frSearchResults"><p class="small muted">Type at least 2 letters to search enrolled game names.</p></div>
+    <p class="fr-status" id="frSearchStatus" role="status"></p>
+
+    <h3>Browse all game names</h3>
+    <p class="small muted" style="margin:2px 0 0">Every player who has claimed a game name, A–Z. Scroll through and tap <b>Send request</b> — no typing needed.</p>
+    <div class="fr-directory" id="frDirectory"><p class="small muted">Loading the list…</p></div>
+    <p class="fr-status" id="frDirectoryNote" role="status"></p>
+
+    <h3>Add a friend</h3>
+    <p class="small muted" style="margin:2px 0 8px">Type their game name exactly. They get a friend request in their game and choose whether to accept — nobody is added without agreeing.</p>
+    <input class="fr-input" id="frAddInput" maxlength="16" placeholder="Their game name" autocomplete="off" autocapitalize="none" aria-label="Friend's game name">
+    <button class="big-btn" id="frAddBtn">Send friend request</button>
+    <p class="fr-status" id="frAddStatus" role="status"></p>
+
+    <h3>Friend requests for you</h3>
+    <div id="frRequests"><p class="small muted">None right now.</p></div>
+
+    <h3>Table invites for you</h3>
+    <div id="frInvites"><p class="small muted">None right now. When a friend invites you to their table, it shows up here — tap Join to sit down. If their game is already going, joining works like the usual mid-game join: the host lets you in and you're dealt in from the next hand.</p></div>
+
+    <h3>Your friends</h3>
+    <div id="frList"><p class="small muted">No friends yet — add one by their game name above.</p></div>
+    <p class="small muted" id="frTableNote" style="margin-top:10px">To invite a friend to a table, create or join one first — then each friend gets an <b>Invite to my table</b> button here, in the lobby, and from the Friends button at the table.</p>
+
+    <button class="ghost-btn" id="frCloseBtn">Done</button>
   </div>
 </div>
 
@@ -1284,7 +1357,7 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
@@ -2776,6 +2849,415 @@ $('lobbyCopyBtn').addEventListener('click', function(){
   mpSetStatus('Joining table '+code+'…');
   mpJoin(code);
 })();
+</script>
+<script>
+'use strict';
+/* ================= Friends by game name (in-app, no phone number) =================
+   Data model (top level of the same Realtime Database, next to rooms/):
+     handles/{handle}            -> uid        (unique claim; a transaction
+                                                only succeeds if the name is
+                                                free or already this player's)
+     profiles/{uid}              -> { handle, name, updatedAt }
+     friendRequests/{toUid}/{fromUid}   -> { fromHandle, fromName, at }
+     friendOut/{uid}/{toUid}     -> { toHandle, at }   (requests I sent)
+     friends/{uid}/{friendUid}   -> { handle, name, since }
+     tableInvites/{toUid}/{id}   -> { fromUid, fromHandle, fromName, code, at }
+   Search and the browsable directory both read the handles node with a
+   key-ordered query (orderByKey), so the security rules need a read rule
+   on the handles node itself, not only on handles/{handle}.
+   Like multiplayer, the Firebase SDK is only loaded when Friends (or a
+   table) is opened, through the same guarded mpConnect() — solo play
+   never touches the network, and any failure here only disables Friends. */
+var FR={
+  uid:null, handle:null, watching:false,
+  friends:{}, incoming:{}, outgoing:{}, invites:{}, directory:{},
+  _seenReq:{}, _seenInv:{}, _bannerDismissed:null, _searchTimer:null
+};
+var FR_HANDLE_KEY='spades.frHandle.v1';
+var FR_DIR_CAP=200, FR_SEARCH_CAP=20;
+function frNorm(s){
+  var h=String(s||'').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'');
+  return /^[a-z0-9_]{3,16}$/.test(h) ? h : null;
+}
+function frNormLoose(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9_]/g,''); }
+function frSetStatus(id, txt){ var el=$(id); if(el) el.textContent=txt||''; }
+function frHandleStatus(t){ frSetStatus('frHandleStatus', t); }
+function frDb(path){ return MP.db.ref(path); }
+function frEnsure(){
+  if(FR.uid && typeof MP!=='undefined' && MP.db) return Promise.resolve(FR.uid);
+  return mpConnect().then(function(uid){
+    FR.uid=uid||MP.uid;
+    frStartWatch();
+    return FR.uid;
+  });
+}
+function frStartWatch(){
+  if(FR.watching || !FR.uid || !MP.db) return;
+  FR.watching=true;
+  /* My own profile: keeps this phone's claimed handle in sync. */
+  frDb('profiles/'+FR.uid).on('value', function(snap){
+    var p=snap.val();
+    if(p && p.handle){
+      FR.handle=p.handle;
+      try{ localStorage.setItem(FR_HANDLE_KEY, p.handle); }catch(e){}
+      var inp=$('frHandleInput'); if(inp && document.activeElement!==inp) inp.value=p.handle;
+    }
+    frRenderAll();
+  });
+  frDb('friendRequests/'+FR.uid).on('value', function(snap){
+    var val=snap.val()||{};
+    Object.keys(val).forEach(function(k){
+      if(!FR._seenReq[k] && Object.keys(FR._seenReq).length>=0 && FR._reqPrimed){
+        toast((val[k] && val[k].fromHandle ? '@'+val[k].fromHandle : 'A player')+' sent you a friend request ♠');
+        try{ beep(880,0.09,0.05); }catch(e){}
+      }
+      FR._seenReq[k]=true;
+    });
+    FR._reqPrimed=true;
+    FR.incoming=val;
+    frRenderAll();
+  });
+  frDb('friendOut/'+FR.uid).on('value', function(snap){ FR.outgoing=snap.val()||{}; frRenderAll(); });
+  frDb('friends/'+FR.uid).on('value', function(snap){ FR.friends=snap.val()||{}; frRenderAll(); });
+  frDb('tableInvites/'+FR.uid).on('value', function(snap){
+    var val=snap.val()||{};
+    Object.keys(val).forEach(function(k){
+      if(!FR._seenInv[k] && FR._invPrimed){
+        toast((val[k] && val[k].fromName ? cleanName(val[k].fromName) : 'A friend')+' invited you to their Spades table ♠');
+        try{ beep(880,0.09,0.05); }catch(e){}
+      }
+      FR._seenInv[k]=true;
+    });
+    FR._invPrimed=true;
+    FR.invites=val;
+    frRenderAll();
+  });
+  /* The browsable directory: every enrolled handle, A–Z, kept live.
+     Capped so a long list stays light; search reaches past the cap. */
+  frDb('handles').orderByKey().limitToFirst(FR_DIR_CAP).on('value', function(snap){
+    FR.directory=snap.val()||{};
+    frRenderDirectory();
+  });
+}
+/* ---------- Claim / change my handle ---------- */
+function frClaim(){
+  var h=frNorm($('frHandleInput').value);
+  if(!h){ frHandleStatus('That name doesn\'t work — use 3–16 letters, numbers or underscores.'); return; }
+  frHandleStatus('Checking that name…');
+  frEnsure().then(function(){
+    return frDb('handles/'+h).transaction(function(cur){
+      if(cur===null || cur===FR.uid) return FR.uid;
+      return undefined; /* taken by someone else — abort */
+    }).then(function(res){
+      if(!res || !res.committed){
+        frHandleStatus('@'+h+' is already taken by another player — the first player to claim a name keeps it. Try a different name.');
+        sndBad();
+        return;
+      }
+      var old=FR.handle;
+      FR.handle=h;
+      try{ localStorage.setItem(FR_HANDLE_KEY, h); }catch(e){}
+      frDb('profiles/'+FR.uid).set({ handle:h, name:mpMyName(), updatedAt:Date.now() }).catch(function(){});
+      if(old && old!==h){
+        frDb('handles/'+old).once('value').then(function(s){
+          if(s.val()===FR.uid) frDb('handles/'+old).set(null).catch(function(){});
+        });
+      }
+      frHandleStatus('Your game name is @'+h+' — friends can find you by that name, by search, or in the browse list.');
+      toast('Game name claimed: @'+h+' ♠');
+      frRenderAll();
+    });
+  }).catch(function(){
+    frHandleStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+/* ---------- Friend requests ---------- */
+function frSendRequestTo(toUid, toHandle){
+  if(!FR.uid) return;
+  if(!FR.handle){ frHandleStatus('Claim your own game name first (above) — your friend needs to see who the request is from.'); try{ $('frHandleInput').focus(); }catch(e){} return; }
+  if(toUid===FR.uid){ toast('That\'s your own game name.'); return; }
+  if(FR.friends[toUid]){ toast('You\'re already friends with @'+toHandle+'.'); return; }
+  if(FR.outgoing[toUid]){ toast('Your request to @'+toHandle+' is already sent — waiting for them to answer.'); return; }
+  var data={ fromHandle:FR.handle, fromName:mpMyName(), at:Date.now() };
+  frDb('friendRequests/'+toUid+'/'+FR.uid).set(data).then(function(){
+    frDb('friendOut/'+FR.uid+'/'+toUid).set({ toHandle:toHandle, at:Date.now() }).catch(function(){});
+    toast('Friend request sent to @'+toHandle+' — they\'ll see it in their game ♠');
+    frSetStatus('frAddStatus','Request sent to @'+toHandle+'.');
+    frSetStatus('frSearchStatus','Request sent to @'+toHandle+'.');
+  }).catch(function(){
+    toast('That request did not go through — check your connection and try again.');
+  });
+}
+function frAddByHandle(){
+  var h=frNorm($('frAddInput').value);
+  if(!h){ frSetStatus('frAddStatus','Type their game name — 3–16 letters, numbers or underscores.'); return; }
+  frSetStatus('frAddStatus','Looking up @'+h+'…');
+  frEnsure().then(function(){
+    return frDb('handles/'+h).once('value').then(function(snap){
+      var toUid=snap.val();
+      if(!toUid){ frSetStatus('frAddStatus','No player has claimed @'+h+' yet — check the spelling, try search, or browse the list above.'); return; }
+      frSendRequestTo(toUid, h);
+    });
+  }).catch(function(){
+    frSetStatus('frAddStatus','Could not connect — check your internet and try again.');
+  });
+}
+function frAcceptRequest(fromUid){
+  var req=FR.incoming[fromUid]; if(!req || !FR.uid) return;
+  var mine={ handle:req.fromHandle||'', name:cleanName(req.fromName||'')||'Player', since:Date.now() };
+  var theirs={ handle:FR.handle||'', name:mpMyName(), since:Date.now() };
+  frDb('friends/'+FR.uid+'/'+fromUid).set(mine).catch(function(){});
+  frDb('friends/'+fromUid+'/'+FR.uid).set(theirs).catch(function(){});
+  frDb('friendRequests/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  frDb('friendOut/'+fromUid+'/'+FR.uid).set(null).catch(function(){});
+  toast('You and @'+(req.fromHandle||'player')+' are friends now ♠');
+}
+function frDeclineRequest(fromUid){
+  if(!FR.uid) return;
+  frDb('friendRequests/'+FR.uid+'/'+fromUid).set(null).catch(function(){});
+  frDb('friendOut/'+fromUid+'/'+FR.uid).set(null).catch(function(){});
+  toast('Friend request declined.');
+}
+/* ---------- Search enrolled handles ---------- */
+function frDoSearch(){
+  var q=frNormLoose($('frSearchInput').value);
+  var box=$('frSearchResults'); if(!box) return;
+  if(q.length<2){ box.innerHTML='<p class="small muted">Type at least 2 letters to search enrolled game names.</p>'; return; }
+  box.innerHTML='<p class="small muted">Searching…</p>';
+  frEnsure().then(function(){
+    return frDb('handles').orderByKey().startAt(q).endAt(q+'\uf8ff').limitToFirst(FR_SEARCH_CAP).once('value');
+  }).then(function(snap){
+    var val=snap.val()||{};
+    var keys=Object.keys(val).sort();
+    if(!keys.length){ box.innerHTML='<p class="small muted">No enrolled game names start with “'+q+'” yet.</p>'; return; }
+    box.innerHTML='';
+    keys.forEach(function(h){ box.appendChild(frPlayerRow(val[h], h)); });
+    if(keys.length>=FR_SEARCH_CAP) frSetStatus('frSearchStatus','Showing the first '+FR_SEARCH_CAP+' matches — type more letters to narrow it down.');
+    else frSetStatus('frSearchStatus','');
+  }).catch(function(){
+    box.innerHTML='<p class="small muted">Search could not connect — check your internet and try again.</p>';
+  });
+}
+/* ---------- One player row (search results + directory) ---------- */
+function frPlayerRow(uid, handle){
+  var row=document.createElement('div'); row.className='fr-row';
+  var who=document.createElement('div'); who.className='who';
+  var b=document.createElement('b'); b.textContent='@'+handle;
+  var tag=document.createElement('span'); tag.className='tag';
+  who.appendChild(b); who.appendChild(tag);
+  row.appendChild(who);
+  var btn=document.createElement('button'); btn.type='button';
+  if(uid===FR.uid){
+    tag.textContent='That\'s you';
+    btn.textContent='You'; btn.disabled=true;
+  } else if(FR.friends[uid]){
+    tag.textContent='Already friends';
+    if(typeof MP!=='undefined' && MP && MP.active && MP.code){
+      btn.textContent='Invite to my table'; btn.className='accept';
+      btn.addEventListener('click', function(){ frInviteFriend(uid, handle); });
+    } else { btn.textContent='Friends ✓'; btn.disabled=true; }
+  } else if(FR.outgoing[uid]){
+    tag.textContent='Request sent — waiting';
+    btn.textContent='Sent'; btn.disabled=true;
+  } else {
+    tag.textContent='Tap to send a friend request';
+    btn.textContent='Send request'; btn.className='accept';
+    btn.addEventListener('click', function(){ frSendRequestTo(uid, handle); });
+  }
+  row.appendChild(btn);
+  return row;
+}
+function frRenderDirectory(){
+  var box=$('frDirectory'); if(!box) return;
+  var keys=Object.keys(FR.directory).sort();
+  if(!FR.uid){ box.innerHTML='<p class="small muted">Loading the list…</p>'; return; }
+  if(!keys.length){ box.innerHTML='<p class="small muted">Nobody has claimed a game name yet — be the first, above.</p>'; frSetStatus('frDirectoryNote',''); return; }
+  box.innerHTML='';
+  keys.forEach(function(h){ box.appendChild(frPlayerRow(FR.directory[h], h)); });
+  frSetStatus('frDirectoryNote', keys.length>=FR_DIR_CAP
+    ? 'Showing the first '+FR_DIR_CAP+' names, A–Z — use search above to find names further down the alphabet.'
+    : keys.length+' enrolled player'+(keys.length===1?'':'s')+'.');
+}
+/* ---------- Table invites ---------- */
+function frInviteFriend(toUid, handle){
+  if(!FR.uid) return;
+  if(!(typeof MP!=='undefined' && MP && MP.active && MP.code)){
+    toast('Create or join a table first — then invite @'+handle+' from here.');
+    return;
+  }
+  if(!FR.handle){ frHandleStatus('Claim your game name first (above) — your friend needs to see who invited them.'); frOpen(); return; }
+  var id=FR.uid+'-'+Date.now();
+  frDb('tableInvites/'+toUid+'/'+id).set({
+    fromUid:FR.uid, fromHandle:FR.handle, fromName:mpMyName(), code:MP.code, at:Date.now()
+  }).then(function(){
+    toast('Invite sent to @'+handle+' — it shows up inside their game ♠');
+  }).catch(function(){
+    toast('That invite did not go through — check your connection and try again.');
+  });
+}
+function frAcceptInvite(id){
+  var inv=FR.invites[id]; if(!inv || !inv.code) return;
+  var code=String(inv.code).toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
+  frDb('tableInvites/'+FR.uid+'/'+id).set(null).catch(function(){});
+  FR._bannerDismissed=id;
+  frRenderBanner();
+  closeAll();
+  if(typeof MP!=='undefined' && MP && MP.active && MP.code && MP.code!==code) mpLeaveTable();
+  $('mpJoinInput').value=code;
+  $('mpOverlay').classList.add('on');
+  mpSetStatus('Joining table '+code+' — invited by '+(inv.fromName ? cleanName(inv.fromName) : 'your friend')+'…');
+  mpJoin(code);
+}
+function frDeclineInvite(id){
+  if(!FR.uid) return;
+  frDb('tableInvites/'+FR.uid+'/'+id).set(null).catch(function(){});
+  if(FR._bannerDismissed===id) FR._bannerDismissed=null;
+  toast('Table invite declined.');
+}
+/* ---------- Rendering ---------- */
+function frRenderAll(){
+  frRenderBadges();
+  frRenderRequests();
+  frRenderInvites();
+  frRenderFriends();
+  frRenderLobbyFriends();
+  frRenderDirectory();
+  frRenderBanner();
+  var note=$('frTableNote');
+  if(note) note.style.display = (typeof MP!=='undefined' && MP && MP.active && MP.code) ? 'none' : 'block';
+}
+function frRenderBadges(){
+  var n=Object.keys(FR.incoming).length+Object.keys(FR.invites).length;
+  document.querySelectorAll('.fr-badge').forEach(function(el){
+    el.textContent = n ? '· '+n+' waiting' : '';
+  });
+}
+function frRenderRequests(){
+  var box=$('frRequests'); if(!box) return;
+  var keys=Object.keys(FR.incoming);
+  if(!keys.length){ box.innerHTML='<p class="small muted">None right now.</p>'; return; }
+  box.innerHTML='';
+  keys.forEach(function(fromUid){
+    var r=FR.incoming[fromUid]||{};
+    var row=document.createElement('div'); row.className='fr-row';
+    var who=document.createElement('div'); who.className='who';
+    var b=document.createElement('b'); b.textContent=(cleanName(r.fromName||'')||'Player')+(r.fromHandle?' (@'+r.fromHandle+')':'');
+    var tag=document.createElement('span'); tag.className='tag'; tag.textContent='Wants to be friends';
+    who.appendChild(b); who.appendChild(tag); row.appendChild(who);
+    var yes=document.createElement('button'); yes.type='button'; yes.className='accept'; yes.textContent='Accept';
+    yes.addEventListener('click', function(){ frAcceptRequest(fromUid); });
+    var no=document.createElement('button'); no.type='button'; no.textContent='Decline';
+    no.addEventListener('click', function(){ frDeclineRequest(fromUid); });
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(row);
+  });
+}
+function frRenderInvites(){
+  var box=$('frInvites'); if(!box) return;
+  var keys=Object.keys(FR.invites);
+  if(!keys.length){ box.innerHTML='<p class="small muted">None right now. When a friend invites you to their table, it shows up here — tap Join to sit down. If their game is already going, joining works like the usual mid-game join: the host lets you in and you\'re dealt in from the next hand.</p>'; return; }
+  box.innerHTML='';
+  keys.forEach(function(id){
+    var inv=FR.invites[id]||{};
+    var row=document.createElement('div'); row.className='fr-row';
+    var who=document.createElement('div'); who.className='who';
+    var b=document.createElement('b'); b.textContent=(cleanName(inv.fromName||'')||'A friend')+(inv.fromHandle?' (@'+inv.fromHandle+')':'');
+    var tag=document.createElement('span'); tag.className='tag'; tag.textContent='Invited you to table '+(inv.code||'');
+    who.appendChild(b); who.appendChild(tag); row.appendChild(who);
+    var yes=document.createElement('button'); yes.type='button'; yes.className='accept'; yes.textContent='Join table';
+    yes.addEventListener('click', function(){ frAcceptInvite(id); });
+    var no=document.createElement('button'); no.type='button'; no.textContent='Decline';
+    no.addEventListener('click', function(){ frDeclineInvite(id); });
+    row.appendChild(yes); row.appendChild(no);
+    box.appendChild(row);
+  });
+}
+function frFriendRow(uid, info, withInvite){
+  var row=document.createElement('div'); row.className='fr-row';
+  var who=document.createElement('div'); who.className='who';
+  var b=document.createElement('b'); b.textContent=(cleanName((info&&info.name)||'')||'Player')+((info&&info.handle)?' (@'+info.handle+')':'');
+  var tag=document.createElement('span'); tag.className='tag'; tag.textContent='Friend';
+  who.appendChild(b); who.appendChild(tag); row.appendChild(who);
+  if(withInvite){
+    var btn=document.createElement('button'); btn.type='button'; btn.className='accept'; btn.textContent='Invite to my table';
+    btn.addEventListener('click', function(){ frInviteFriend(uid, (info&&info.handle)||''); });
+    row.appendChild(btn);
+  }
+  return row;
+}
+function frRenderFriends(){
+  var box=$('frList'); if(!box) return;
+  var keys=Object.keys(FR.friends);
+  if(!keys.length){ box.innerHTML='<p class="small muted">No friends yet — add one by their game name above.</p>'; return; }
+  var atTable = (typeof MP!=='undefined' && MP && MP.active && MP.code);
+  box.innerHTML='';
+  keys.forEach(function(uid){ box.appendChild(frFriendRow(uid, FR.friends[uid], !!atTable)); });
+}
+function frRenderLobbyFriends(){
+  var box=$('lobbyFriends'); if(!box || !FR.uid) return;
+  var keys=Object.keys(FR.friends);
+  if(!keys.length){ box.innerHTML='<p class="small muted">No friends yet — add some from Friends on the start screen, by game name.</p>'; return; }
+  box.innerHTML='';
+  keys.forEach(function(uid){ box.appendChild(frFriendRow(uid, FR.friends[uid], true)); });
+}
+function frRenderBanner(){
+  var banner=$('frInviteBanner'); if(!banner) return;
+  var keys=Object.keys(FR.invites);
+  if(!keys.length){ banner.hidden=true; banner.innerHTML=''; return; }
+  keys.sort(function(a,b){ return ((FR.invites[a]||{}).at||0)-((FR.invites[b]||{}).at||0); });
+  var id=keys[keys.length-1], inv=FR.invites[id]||{};
+  if(FR._bannerDismissed===id){ banner.hidden=true; return; }
+  banner.innerHTML='';
+  var txt=document.createElement('div');
+  var nm=document.createElement('b'); nm.textContent=(cleanName(inv.fromName||'')||'A friend')+(inv.fromHandle?' (@'+inv.fromHandle+')':'');
+  txt.appendChild(nm);
+  txt.appendChild(document.createTextNode(' invited you to their Spades table ('+(inv.code||'')+'). Join and you\'re at their table — if their game is already going, the host lets you in and you\'re dealt in from the next hand.'));
+  banner.appendChild(txt);
+  var btns=document.createElement('div'); btns.className='fr-banner-btns';
+  var yes=document.createElement('button'); yes.type='button'; yes.className='accept'; yes.textContent='✓ Join their table';
+  yes.addEventListener('click', function(){ frAcceptInvite(id); });
+  var later=document.createElement('button'); later.type='button'; later.textContent='Later';
+  later.addEventListener('click', function(){ FR._bannerDismissed=id; frRenderBanner(); });
+  btns.appendChild(yes); btns.appendChild(later);
+  banner.appendChild(btns);
+  banner.hidden=false;
+}
+/* ---------- Open / wiring ---------- */
+function frOpen(){
+  closeAll();
+  $('friendsOverlay').classList.add('on');
+  var inp=$('frHandleInput');
+  if(inp && !inp.value){
+    var saved=null; try{ saved=localStorage.getItem(FR_HANDLE_KEY); }catch(e){}
+    var suggestion = saved || frNorm(mpMyName()==='You' ? '' : mpMyName()) || '';
+    if(suggestion) inp.value=suggestion;
+  }
+  if(FR.handle) frHandleStatus('Your game name is @'+FR.handle+' — friends can find you by that name.');
+  frRenderAll();
+  frEnsure().then(function(){
+    frRenderAll();
+    if(FR.handle) frHandleStatus('Your game name is @'+FR.handle+' — friends can find you by that name.');
+  }).catch(function(){
+    frHandleStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+$('friendsBtn1').addEventListener('click', frOpen);
+$('friendsBtn2').addEventListener('click', frOpen);
+$('mpFriendsBtn').addEventListener('click', frOpen);
+$('mpFriendsBtn2').addEventListener('click', frOpen);
+$('frCloseBtn').addEventListener('click', function(){
+  closeAll();
+  /* If the lobby was open underneath, return to it so the table isn't lost. */
+  if(typeof MP!=='undefined' && MP && MP.active && MP.code && MP.meta && MP.meta.status==='lobby') mpEnterLobby();
+});
+$('frClaimBtn').addEventListener('click', frClaim);
+$('frHandleInput').addEventListener('keydown', function(e){ if(e.key==='Enter') frClaim(); });
+$('frAddBtn').addEventListener('click', frAddByHandle);
+$('frAddInput').addEventListener('keydown', function(e){ if(e.key==='Enter') frAddByHandle(); });
+$('frSearchInput').addEventListener('input', function(){
+  if(FR._searchTimer) clearTimeout(FR._searchTimer);
+  FR._searchTimer=setTimeout(frDoSearch, 300);
+});
 </script>
 </body>
 </html>
