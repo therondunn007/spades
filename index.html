@@ -1459,7 +1459,13 @@ var MP={
      free seat in players (their request), the host approves or declines
      at the table, and the public state carries the answer back. */
   joinRequests:{}, declinedUids:{}, declineNote:null,
-  joinPending:false, _joinResolved:false
+  joinPending:false, _joinResolved:false,
+  /* Finished-trick display on guests: the host keeps the last completed
+     trick in its public state (_lastTrick, published as pub.lastTrick),
+     and a guest holds each finished trick in the centre of the table —
+     winning card highlighted — for a minimum moment (_ft, with any newer
+     update deferred in _pendingPub) before the table moves on. */
+  _lastTrick:null, _ft:null, _pendingPub:null, _holdTimer:null
 };
 function mpMyName(){ return playerNameFor(selectedCount,0); }
 /* Seat maths: the game engine always sees the local player at index 0,
@@ -2346,6 +2352,16 @@ function mpPublicState(){
   if(G.phase==='scoring'){
     pub.result={ title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:'Waiting for the host…' };
   }
+  /* Keep the just-finished trick in the update stream until the next
+     trick finishes. Guests hold a finished trick on screen briefly —
+     the same beat solo play uses — and a phone whose completed-trick
+     update was overtaken by the cleared table (busy screen, slow
+     network) can still show every card that was played from this copy
+     before the next trick starts. */
+  if(pub.phase==='trickEnd' && pub.trick && pub.trick.length===pub.count){
+    MP._lastTrick={ handNo:pub.handNo, trickNo:pub.trickNo, trick:pub.trick };
+  }
+  if(MP._lastTrick && MP._lastTrick.handNo===pub.handNo) pub.lastTrick=MP._lastTrick;
   /* Join-request answers ride in the public state: who was let in (and
      at which seat), and — briefly — who was told there's no room, so
      their phone can stop waiting and free the seat claim. */
@@ -2513,7 +2529,72 @@ function mpWatchGuestGame(){
     mpApplyPublic(pub);
   });
 }
+/* ---- Guest trick display: a finished trick stays on the table ----
+   Solo play holds a finished trick in the centre — every card face-up,
+   the winning card highlighted — for a beat before gathering it. The
+   host keeps that same beat, but on a guest's phone the beat can be
+   eaten by the network: the update carrying the completed trick and
+   the update carrying the cleared table can arrive back to back, or
+   the completed one can be missed entirely while the phone is busy,
+   so the guest sees only their own card and then an empty table, with
+   no record of what anyone else played. So a guest never lets an
+   update move past a finished trick until that trick — taken live, or
+   rebuilt from the host's kept copy (pub.lastTrick) — has sat in the
+   centre, winner highlighted, for a minimum moment. */
+var MP_TRICK_HOLD_MS=1500;
 function mpApplyPublic(pub){
+  if(!MP.active || MP.isHost || !pub) return;
+  var now=Date.now();
+  var key=pub.handNo+':'+pub.trickNo;
+  /* This update shows a trick completing live: remember it, so the
+     moment the table tries to move past it we know how long it has
+     been on this screen. */
+  var fullHere = pub.phase==='trickEnd' && pub.trick && pub.trick.length===pub.count;
+  if(fullHere && (!MP._ft || MP._ft.key!==key)){
+    MP._ft={ key:key, handNo:pub.handNo, trickNo:pub.trickNo, trick:pub.trick, shownAt:0 };
+  }
+  /* Has the table moved past a finished trick? Either one this phone
+     saw complete, or the host's kept copy of the one it just missed. */
+  var ft=null;
+  if(MP._ft && MP._ft.key!==key && MP._ft.handNo===pub.handNo) ft=MP._ft;
+  var lt=pub.lastTrick;
+  if(!ft && lt && lt.handNo===pub.handNo && lt.trickNo===pub.trickNo-1 && lt.trick && lt.trick.length===pub.count
+     && (!MP._ft || MP._ft.key!==lt.handNo+':'+lt.trickNo)){
+    ft={ key:lt.handNo+':'+lt.trickNo, handNo:lt.handNo, trickNo:lt.trickNo, trick:lt.trick, shownAt:0 };
+    MP._ft=ft;
+  }
+  if(ft && !fullHere){
+    var shownFor = ft.shownAt ? (now-ft.shownAt) : 0;
+    if(shownFor < MP_TRICK_HOLD_MS){
+      /* Hold the finished trick in the centre a moment longer; the
+         newer update applies when the hold runs out. */
+      MP._pendingPub=pub;
+      var held={}; for(var hk in pub) held[hk]=pub[hk];
+      held.phase='trickEnd';
+      held.trick=ft.trick;
+      var wAbs=ft.trick[trickWinnerIdx(ft.trick)].p;
+      var wName=(pub.players && pub.players[wAbs]) ? (cleanName(pub.players[wAbs].name||'')||'Player') : 'Player';
+      held.msg='<b>'+wName+'</b> takes trick '+ft.trickNo+'.';
+      mpApplyPublicNow(held);
+      if(!ft.shownAt) ft.shownAt=now;
+      if(MP._holdTimer) clearTimeout(MP._holdTimer);
+      MP._holdTimer=setTimeout(function(){
+        MP._holdTimer=null;
+        var p=MP._pendingPub; MP._pendingPub=null;
+        if(p && MP.active && !MP.isHost) mpApplyPublic(p);
+      }, MP_TRICK_HOLD_MS-shownFor+40);
+      return;
+    }
+    /* The finished trick had its moment — let the table move on. */
+    MP._ft=null;
+  }
+  /* Applying the newest update directly: any deferred one is stale. */
+  MP._pendingPub=null;
+  if(MP._holdTimer){ clearTimeout(MP._holdTimer); MP._holdTimer=null; }
+  mpApplyPublicNow(pub);
+  if(fullHere && MP._ft && MP._ft.key===key && !MP._ft.shownAt) MP._ft.shownAt=now;
+}
+function mpApplyPublicNow(pub){
   if(!MP.active || MP.isHost) return;
   if(pub.hostUid) MP.hostUid=pub.hostUid;
   var count=pub.count, mySeat=MP.mySeat;
@@ -2598,6 +2679,8 @@ function mpLeaveTable(){
   MP.lastPub=null; MP.lastPubJson=''; MP.lastHandsJson=''; MP.lastBackupJson=''; MP._readySent=false; MP._allReady=false;
   MP.presence={}; MP.awaySince={}; MP.hostUid=null; MP._presenceReady=false; MP._takeoverBusy=false; MP._unknownHands={};
   MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
+  if(MP._holdTimer){ clearTimeout(MP._holdTimer); MP._holdTimer=null; }
+  MP._pendingPub=null; MP._ft=null; MP._lastTrick=null;
   mpSetCancelReqVisible(false);
   mpReadyListening=false; mpIntentsListening=false;
   var bar=$('mpBar'); if(bar) bar.hidden=true;
