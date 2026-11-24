@@ -217,6 +217,33 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
 .name-field input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--text);font-size:16px;font-family:inherit}
 #namesForm h3{margin:16px 0 2px;font-size:16px}
 .footer-note{text-align:center;margin-top:16px}
+/* ---------- Multiplayer ---------- */
+.mp-code{font-size:52px;font-weight:bold;letter-spacing:.35em;text-align:center;color:var(--gold-soft);background:rgba(0,0,0,.35);border:1px solid rgba(212,175,55,.5);border-radius:14px;padding:14px 6px 14px 20px;margin:12px 0;font-family:Georgia,serif}
+.mp-link{word-break:break-all;font-family:Verdana,sans-serif;font-size:12.5px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:10px 12px;line-height:1.6}
+.mp-input{width:100%;padding:13px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.3);color:var(--text);font-size:24px;font-family:inherit;text-transform:uppercase;letter-spacing:.3em;text-align:center}
+.mp-players{display:grid;gap:8px;margin:12px 0}
+.mp-player{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.16);border-radius:11px;padding:11px 13px;font-size:16px}
+.mp-player .tag{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted)}
+.mp-player.empty{opacity:.65;border-style:dashed}
+.mp-status{font-family:Verdana,sans-serif;font-size:13px;color:var(--muted);line-height:1.6;text-align:center;min-height:22px}
+.friends-btn{background:var(--btn2);color:#fff;border:1px solid rgba(212,175,55,.55)}
+a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:border-box}
+.mp-player.away{border-color:#c98a2d;background:rgba(120,70,0,.25)}
+.mp-player .tag.away{color:#f0b95a}
+.opp.away{border-color:#c98a2d;opacity:.85}
+.mp-bar{background:var(--panel);border:1px solid rgba(212,175,55,.45);border-radius:14px;padding:10px 12px;margin-bottom:10px;box-shadow:var(--shadow)}
+.mp-bar[hidden]{display:none !important}
+.mp-bar-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mp-bar-row .mp-bar-info{font-family:Verdana,sans-serif;font-size:12.5px;color:var(--muted);margin-right:auto;line-height:1.5}
+.mp-bar-row .mp-bar-info b{color:var(--gold-soft)}
+.mp-bar-btn{background:var(--gold);color:#231a02;border:none;border-radius:10px;padding:9px 13px;font-size:14.5px;font-weight:bold}
+.mp-bar-btn:active{transform:scale(.97)}
+.mp-bar a.mp-bar-btn{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);text-decoration:none;font-weight:normal}
+.mp-away-banner{font-family:Verdana,sans-serif;font-size:13px;line-height:1.55;color:#f0cf8a;margin-top:8px}
+.mp-away-banner:empty{display:none}
+.mp-replace-bar{display:grid;gap:8px;margin-top:8px}
+.mp-replace-bar:empty{display:none}
+.mp-replace-bar button{padding:11px;border-radius:11px;background:#7a4a12;color:#ffe9bd;border:1px solid #c98a2d;font-size:15px;text-align:left}
 </style>
 </head>
 <body data-deck="classic">
@@ -253,6 +280,8 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
       </div>
       <p class="small muted" id="scoreExplain">Bid = points: bid 4 and make it, you score 4 — overtricks add nothing. Miss your bid and you lose your bid (−4). Nil still pays +10 / −10. First to 35 still wins.</p>
       <button class="big-btn" id="dealBtn">Shuffle &amp; deal</button>
+      <button class="big-btn friends-btn" id="mpBtn">👥 Play with friends — live multiplayer</button>
+      <p class="small muted" style="text-align:center;margin:8px 0 0">Create a table, share the 4-letter code, and play live against friends on their own phones. Empty seats are filled by the computer.</p>
       <button class="ghost-btn" id="howBtn1">How to play &amp; scoring</button>
       <button class="ghost-btn" id="installBtn1">⬇ Install app — add to home screen</button>
       <button class="ghost-btn" id="namesBtn1">✎ Player names</button>
@@ -261,6 +290,15 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
 
   <!-- ============ GAME SCREEN ============ -->
   <section class="screen" id="gameScreen">
+    <div class="mp-bar" id="mpBar" hidden>
+      <div class="mp-bar-row">
+        <span class="mp-bar-info" id="mpBarInfo"></span>
+        <button class="mp-bar-btn" id="mpInviteBtn2" type="button">📤 Invite</button>
+        <a class="mp-bar-btn" id="mpSmsBtn2" href="#">💬 Text invite</a>
+      </div>
+      <div class="mp-away-banner" id="mpAwayBanner" role="status"></div>
+      <div class="mp-replace-bar" id="mpReplaceBar"></div>
+    </div>
     <div class="table-zone">
       <div class="opponents" id="opponents"></div>
       <div class="trick-area" id="trickArea"><div class="trick-empty">Bidding first — then the trick cards land here.</div></div>
@@ -402,6 +440,53 @@ table.score-table th:first-child,table.score-table td:first-child{text-align:lef
     <div id="installBody"></div>
     <button class="big-btn" id="installNowBtn" style="display:none">⬇ Install Spades</button>
     <button class="ghost-btn" id="closeInstallBtn">Close</button>
+  </div>
+</div>
+
+<!-- ============ MULTIPLAYER: CREATE / JOIN ============ -->
+<div class="overlay" id="mpOverlay" role="dialog" aria-modal="true" aria-label="Play with friends">
+  <div class="sheet">
+    <h2>Play with friends</h2>
+    <p class="small muted">Play live against friends, each on their own phone. One person creates the table and shares the code; everyone else joins with it. Any seat nobody takes is played by the computer, just like solo play.</p>
+    <h3>Create a table</h3>
+    <p class="small muted" style="margin:2px 0 0">Table size</p>
+    <div class="seg" id="mpCountSeg" role="group" aria-label="Multiplayer table size">
+      <button data-n="2"><span class="n">2</span>Heads-up</button>
+      <button data-n="3"><span class="n">3</span>Solo seats</button>
+      <button data-n="4" class="sel"><span class="n">4</span>Partners</button>
+    </div>
+    <p class="small muted" style="margin:2px 0 0">Scoring</p>
+    <div class="seg" id="mpScoreSeg" role="group" aria-label="Multiplayer scoring">
+      <button data-mode="bid" class="sel"><span class="n" style="font-size:17px">Bid = points</span></button>
+      <button data-mode="standard"><span class="n" style="font-size:17px">Standard</span></button>
+    </div>
+    <button class="big-btn" id="mpCreateBtn">Create table &amp; get my code</button>
+    <h3 style="margin-top:22px">Join a table</h3>
+    <p class="small muted">Type the 4-letter code your friend gave you:</p>
+    <input class="mp-input" id="mpJoinInput" maxlength="4" placeholder="CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code">
+    <button class="big-btn" id="mpJoinBtn">Join table</button>
+    <p class="mp-status" id="mpStatus" role="status"></p>
+    <button class="ghost-btn" id="mpCloseBtn">Back</button>
+  </div>
+</div>
+
+<!-- ============ MULTIPLAYER: LOBBY ============ -->
+<div class="overlay" id="lobbyOverlay" role="dialog" aria-modal="true" aria-label="Multiplayer table lobby">
+  <div class="sheet">
+    <h2>Your table code</h2>
+    <p class="small muted" id="lobbySub">Share this code — or send the link — and your friends tap straight into this table.</p>
+    <div class="mp-code" id="lobbyCode">····</div>
+    <div class="mp-link" id="lobbyLink"></div>
+    <button class="big-btn" id="lobbyInviteBtn" type="button">📤 Invite friends</button>
+    <p class="small muted" style="text-align:center;margin:7px 0 0">Opens your phone's share sheet — pick a contact, Messages, or any app to send the join link.</p>
+    <a class="ghost-btn" id="lobbySmsBtn" href="#">💬 Text the invite instead</a>
+    <button class="ghost-btn" id="lobbyCopyBtn">Copy the join link</button>
+    <p class="small muted" style="text-align:center;margin:9px 0 0">If someone's phone closes or loses signal mid-game, their seat waits for them — reopening the game puts them straight back in their seat with their cards.</p>
+    <h3 style="margin-top:18px">At this table</h3>
+    <div class="mp-players" id="lobbyPlayers"></div>
+    <p class="mp-status" id="lobbyStatus" role="status"></p>
+    <button class="big-btn" id="lobbyStartBtn" style="display:none">Start the game</button>
+    <button class="ghost-btn" id="lobbyLeaveBtn">Leave table</button>
   </div>
 </div>
 
@@ -665,6 +750,9 @@ function loadSettings(){
 }
 function saveGame(){
   if(!G) return;
+  /* Multiplayer games live in the shared room, not in this device's solo
+     save — never overwrite a solo save with a multiplayer table. */
+  if(typeof MP!=='undefined' && MP && MP.active) return;
   try{
     var data={ v:1, savedAt:Date.now(), G:G, msg:$('msg').innerHTML,
       result: (G.phase==='scoring' && $('resultBody').innerHTML) ? { title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:$('resultBtn').textContent } : null };
@@ -749,6 +837,25 @@ function startGame(count){
   var names=[];
   for(var ni=0;ni<count;ni++) names.push(playerNameFor(count,ni));
   for(var i=0;i<count;i++) G.players.push({name:names[i], human:i===0, hand:[], bid:null, tricks:0, score:0});
+  /* Multiplayer (host): seats taken by friends keep their own names and
+     are flagged remote, so the host waits for their moves instead of
+     playing them as AI or as the local player. */
+  if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && MP.seats){
+    for(var mi=0;mi<count;mi++){
+      /* Seats in the room are numbered absolutely; a host who took over
+         from another seat translates its view index to the room's seat. */
+      var absSeat=(typeof mpViewToAbs==='function' && MP.mySeat) ? mpViewToAbs(mi) : mi;
+      var seatInfo=MP.seats[String(absSeat)];
+      if(seatInfo && seatInfo.uid){
+        /* Remote names are untrusted input from the database — strip any
+           markup characters before the name is ever rendered. */
+        G.players[mi].name=cleanName(seatInfo.name)||G.players[mi].name;
+        G.players[mi].uid=seatInfo.uid;
+        G.players[mi].human=true;
+        G.players[mi].remote=(seatInfo.uid!==MP.uid);
+      }
+    }
+  }
   setGameActive(true);
   $('startScreen').classList.remove('on');
   $('gameScreen').classList.add('on');
@@ -757,6 +864,7 @@ function startGame(count){
   toast('New game — '+SCORING_NAMES[selectedScoring]+', first to 35. Good luck ♠');
 }
 function backToStart(){
+  if(typeof MP!=='undefined' && MP && MP.active) mpLeaveTable();
   epoch++; G=null; clearSave(); setGameActive(false); closeAll();
   $('gameScreen').classList.remove('on');
   $('startScreen').classList.add('on');
@@ -783,6 +891,8 @@ function newDeal(){
      highlight sits on whoever acted last in the previous hand until the
      first bid is taken, naming the wrong player. */
   G.current=G.bidQueue[0];
+  /* Multiplayer host: a fresh deal clears everyone's Ready taps. */
+  if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && typeof mpResetReady==='function') mpResetReady();
   renderAll();
   setMsg('Hand '+G.handNo+' — <b>'+G.players[G.dealer].name+'</b> dealt. <b>Look over your cards below</b>, then tap <b>Ready</b> when you want to bid.');
   /* No bidding timer: the player reviews their hand for as long as they
@@ -804,6 +914,15 @@ function handSummaryText(){
 }
 function startBidding(){
   if(!G||G.phase!=='review') return;
+  /* Multiplayer: a guest's Ready tap is sent to the host, and the host
+     only opens bidding once every human at the table has tapped Ready. */
+  if(typeof MP!=='undefined' && MP && MP.active){
+    if(!MP.isHost){ mpGuestReady(); return; }
+    if(!MP._allReady){
+      mpHostReady();
+      if(!MP._allReady){ renderAll(); setMsg('You\'re ready — <b>waiting for the rest of the table</b> to look over their cards…'); return; }
+    }
+  }
   G.phase='bidding';
   beep(660,0.06,0.05);
   renderAll();
@@ -828,6 +947,11 @@ function nextBid(){
    reopened mid-bidding, to pick the bidding back up where it stopped. */
 function takeBid(idx){
   if(!G||G.phase!=='bidding') return;
+  /* Multiplayer host: a friend's bid arrives as a room write — wait for it. */
+  if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && G.players[idx].remote){
+    setMsg('Waiting on <b>'+G.players[idx].name+'</b> to bid…');
+    renderAll(); return;
+  }
   if(G.players[idx].human){ showBidUI(); return; }
   var myEpoch=epoch;
   setTimeout(function(){
@@ -847,8 +971,10 @@ function showBidUI(){
       if(bid===0) btn.className='nil';
       btn.setAttribute('aria-label', bid===0?'Bid Nil (zero tricks)':'Bid '+bid);
       btn.addEventListener('click',function(){
-        G.players[0].bid=bid; beep(660,0.06,0.05);
         $('bidOverlay').classList.remove('on');
+        /* Multiplayer guest: the bid is a write to the room; the host applies it. */
+        if(typeof MP!=='undefined' && MP && MP.active && !MP.isHost){ mpSendIntent({type:'bid', value:bid}); beep(660,0.06,0.05); setMsg('You bid '+(bid===0?'<b>Nil</b>':'<b>'+bid+'</b>')+' — waiting for the table…'); return; }
+        G.players[0].bid=bid; beep(660,0.06,0.05);
         renderAll(); nextBid();
       });
       grid.appendChild(btn);
@@ -948,6 +1074,13 @@ function legalCards(pIdx){
   return follow.length? follow : p.hand.slice();
 }
 function playCard(pIdx, card){
+  /* Multiplayer guest: playing a card is a write to the room; the host's
+     table applies it and every phone re-renders from the room. */
+  if(typeof MP!=='undefined' && MP && MP.active && !MP.isHost){
+    mpSendIntent({type:'play', card:{suit:card.suit, rank:card.rank}});
+    sndPlay();
+    return;
+  }
   var p=G.players[pIdx];
   var hi=p.hand.findIndex(function(c){return c.suit===card.suit&&c.rank===card.rank;});
   if(hi<0) return;
@@ -1075,9 +1208,13 @@ function renderAll(){
   for(var i=1;i<G.count;i++){
     (function(i){
       var p=G.players[i];
+      /* Multiplayer presence: a friend whose phone closed or lost signal
+         shows as away on their seat until they reconnect. */
+      var away=false;
+      if(typeof MP!=='undefined' && MP && MP.active && typeof mpIsViewSeatAway==='function') away=mpIsViewSeatAway(i);
       var div=document.createElement('div');
-      div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'');
-      div.innerHTML='<div class="nm">'+p.name+(G.count===4&&i===2?' 🤝':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+'</div>';
+      div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'')+(away?' away':'');
+      div.innerHTML='<div class="nm">'+p.name+(G.count===4&&i===2?' 🤝':'')+(away?' ⏳':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+(away?'<br>⏳ Away — waiting to reconnect':'')+'</div>';
       opps.appendChild(div);
     })(i);
   }
@@ -1120,10 +1257,13 @@ function renderAll(){
   /* Autosave: every render reflects the latest state, so the game is
      always saved exactly as it stands. */
   saveGame();
+  /* Multiplayer host: the room is the source of truth, so every render
+     also publishes the table (public state + each player's private hand). */
+  if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && typeof mpHostSync==='function') mpHostSync();
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay'].forEach(function(id){ $(id).classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
@@ -1134,6 +1274,8 @@ $('restartBtn').addEventListener('click',function(){
 $('setupBtn').addEventListener('click',function(){ backToStart(); toast('Pick your table size to start a new game.'); });
 $('resultRestartBtn').addEventListener('click',function(){ var c=G?G.count:selectedCount; closeAll(); startGame(c); });
 $('resultBtn').addEventListener('click',function(){
+  /* Multiplayer guests wait for the host to deal the next hand. */
+  if(typeof MP!=='undefined' && MP && MP.active && !MP.isHost){ toast('Waiting for the host to deal the next hand…'); return; }
   closeAll();
   if(!G) return;
   if(G.over){ startGame(G.count); return; }
@@ -1247,9 +1389,1020 @@ $('dealBtn').addEventListener('click',function(){ startGame(selectedCount); });
 $('readyBidBtn').addEventListener('click',function(){ startBidding(); });
 updateWakeUI();
 renderScores();
-/* Restore remembered settings, then pick up a saved game if there is one. */
+/* Restore remembered settings, then pick up a saved game if there is one.
+   A ?room=CODE link skips the solo resume — that visitor is here to join
+   a friend's table (the multiplayer script below handles the auto-join). */
 loadSettings();
-loadSavedGame();
+if(!new URLSearchParams(location.search).get('room')) loadSavedGame();
+</script>
+<script>
+'use strict';
+/* ================= Multiplayer — live tables over Firebase =================
+   One room object in the Realtime Database is the single source of truth:
+     rooms/{CODE}/meta     table settings + status (lobby / playing)
+     rooms/{CODE}/players  seats: { seatIndex: { uid, name } }
+     rooms/{CODE}/public   the shared table state every phone renders from
+     rooms/{CODE}/hands/{uid}  that player's cards — readable only by them
+     rooms/{CODE}/intents/{seat}  a player's move, written by their phone
+     rooms/{CODE}/ready/{seat}    Ready taps for the current hand
+   The host's phone runs the same game engine as solo play and publishes
+   the table after every change; guests render a mirror of the room and
+   send their bids / cards / Ready taps back as intents. Empty seats are
+   played by the host's AI, exactly like solo play.
+   The Firebase SDK is loaded lazily, only when multiplayer is opened, so
+   solo play never touches the network and works offline exactly as before.
+   If the SDK or sign-in fails, multiplayer reports it and solo is unaffected. */
+var FIREBASE_CONFIG={
+  apiKey:'AIzaSyDC0o2Q11GSJKxylTsyDQMBDDZRx0iVi1g',
+  authDomain:'spades-multiplayer-65d6c.firebaseapp.com',
+  databaseURL:'https://spades-multiplayer-65d6c-default-rtdb.firebaseio.com',
+  projectId:'spades-multiplayer-65d6c',
+  storageBucket:'spades-multiplayer-65d6c.firebasestorage.app',
+  messagingSenderId:'402065821930',
+  appId:'1:402065821930:web:0f5e76ba3c3ee9bc824793'
+};
+var MP_LIVE_BASE='https://spades-kappa.vercel.app/';
+var MP={
+  active:false, isHost:false, code:null, uid:null, mySeat:-1,
+  db:null, roomRef:null, seats:null, meta:null,
+  myCards:[], lastPub:null, lastPubJson:'', lastHandsJson:'', lastBackupJson:'',
+  readyMap:{}, _allReady:false, _readySent:false, _bidShownKey:'',
+  _resultShownKey:'', _intentSeq:0, _processedIntents:{}, listeners:[],
+  presence:{}, awaySince:{}, hostUid:null, _presenceReady:false,
+  _presenceTimer:null, _uiTimer:null, _takeoverBusy:false, _unknownHands:{}
+};
+function mpMyName(){ return playerNameFor(selectedCount,0); }
+/* Seat maths: the game engine always sees the local player at index 0,
+   while the room numbers seats absolutely (host = seat 0). For the host
+   the two are the same; for a guest — or a guest who has taken over as
+   host — these translate between the two. */
+function mpTableCount(){ return G ? G.count : ((MP.meta && MP.meta.count) || selectedCount); }
+function mpViewToAbs(v){ var c=mpTableCount(); return (((v+MP.mySeat)%c)+c)%c; }
+function mpAbsToView(a){ var c=mpTableCount(); return (((a-MP.mySeat)%c)+c)%c; }
+function mpRoomLink(){ return MP_LIVE_BASE+'?room='+MP.code; }
+/* ---- Session resume: remember this phone's table on the device, so
+   closing and reopening the app can walk straight back to the same seat.
+   Firebase anonymous sign-in keeps the same uid on this device, and the
+   room's players node maps that uid back to its seat and hand. ---- */
+var MP_SESSION_KEY='spades.mpSession.v1';
+function mpSaveSession(){
+  if(!MP.active || !MP.code) return;
+  try{ localStorage.setItem(MP_SESSION_KEY, JSON.stringify({ code:MP.code, seat:MP.mySeat, savedAt:Date.now() })); }catch(e){}
+}
+function mpClearSession(){ try{ localStorage.removeItem(MP_SESSION_KEY); }catch(e){} }
+function mpLoadSession(){
+  try{
+    var s=JSON.parse(localStorage.getItem(MP_SESSION_KEY)||'null');
+    if(!s || !s.code) return null;
+    if(Date.now()-(s.savedAt||0) > 12*60*60*1000) return null; /* stale tables are gone games */
+    return s;
+  }catch(e){ return null; }
+}
+/* The host's public state carries two HTML strings (the table message and
+   the hand-result sheet). A host is another person's phone, so guests
+   never inject that HTML raw: strip anything that can run code — script-
+   bearing tags, inline event handlers, and javascript: URLs — and keep
+   the plain formatting (b, table, p) the game actually uses. */
+function mpSanitizeHtml(html){
+  var tpl=document.createElement('template');
+  tpl.innerHTML=String(html||'');
+  var kill=['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','FORM','LINK','META','BASE','TITLE'];
+  var els=tpl.content.querySelectorAll('*');
+  for(var i=els.length-1;i>=0;i--){
+    var el=els[i];
+    if(kill.indexOf(el.tagName)>=0){ el.remove(); continue; }
+    var attrs=el.attributes;
+    for(var a=attrs.length-1;a>=0;a--){
+      var an=attrs[a].name.toLowerCase(), av=attrs[a].value||'';
+      if(an.indexOf('on')===0 || ((an==='href'||an==='src'||an==='xlink:href') && /^\s*javascript:/i.test(av))){
+        el.removeAttribute(attrs[a].name);
+      }
+    }
+  }
+  return tpl.innerHTML;
+}
+function mpSetStatus(txt){ var s=$('mpStatus'); if(s) s.textContent=txt||''; }
+function mpSetLobbyStatus(txt){ var s=$('lobbyStatus'); if(s) s.textContent=txt||''; }
+
+/* ================= Invite — share sheet, text message, copy =================
+   The Invite button uses the phone's own share sheet (Web Share API), so
+   the host picks a contact or Messages right there and the join link goes
+   out as a text. Where no share sheet exists, the "Text the invite" link
+   (an sms: link with the invite prefilled) and Copy link are the fallback,
+   and both are always on screen next to the Invite button. */
+function mpSmsHref(){
+  if(!MP.code) return '#';
+  var body='Join my Spades table! Tap this link to sit down: '+mpRoomLink()+' — or open Spades and use table code '+MP.code+'.';
+  /* sms:?&body= is understood by both iOS and Android messengers. */
+  return 'sms:?&body='+encodeURIComponent(body);
+}
+function mpUpdateInviteUI(){
+  if(!MP.code) return;
+  var link=mpRoomLink();
+  var le=$('lobbyLink'); if(le) le.textContent=link;
+  var sms=$('lobbySmsBtn'); if(sms) sms.setAttribute('href', mpSmsHref());
+  var sms2=$('mpSmsBtn2'); if(sms2) sms2.setAttribute('href', mpSmsHref());
+  var info=$('mpBarInfo');
+  if(info) info.innerHTML='♠ Table <b>'+MP.code+'</b> · '+(MP.isHost?'You are hosting':'Hosted table')+' · your seat '+(MP.mySeat+1);
+}
+function mpInvite(){
+  if(!MP.code){ toast('Create or join a table first.'); return; }
+  var link=mpRoomLink();
+  if(navigator.share){
+    navigator.share({
+      title:'Spades — join my table',
+      text:'Join my Spades table! Tap the link to sit down at table '+MP.code+'.',
+      url:link
+    }).then(function(){}, function(err){
+      /* The player closing the share sheet is not an error. Anything else:
+         point them at the text-message fallback sitting right there. */
+      if(err && err.name!=='AbortError') toast('Sharing did not open — use “Text the invite” or “Copy the join link” instead.');
+    });
+    return;
+  }
+  /* No share sheet on this browser: the sms: link is the invite route. */
+  toast('No share sheet in this browser — tap “Text the invite” to send it as a text message.');
+  var sms=$('lobbySmsBtn');
+  if(sms && $('lobbyOverlay').classList.contains('on')){ try{ sms.focus(); }catch(e){} }
+}
+
+/* ================= Presence & reconnect =================
+   Every phone at the table writes a presence heartbeat for its seat and
+   registers an onDisconnect write, so closing the app, switching away, or
+   losing signal flips the seat to away within seconds — no action needed
+   from anyone. The seat (and its private hand node) stays in the room, so
+   reopening the game — same link, home-screen icon, or just the app —
+   signs back in with the same uid, finds the same seat, and the hand is
+   dealt straight back to that phone. */
+function mpSeatInfo(absSeat){ return (MP.seats && MP.seats[String(absSeat)]) || null; }
+function mpIsSeatAway(absSeat){
+  if(!MP.active) return false;
+  var info=mpSeatInfo(absSeat);
+  if(!info) return false; /* empty seat = computer player, never "away" */
+  var pr=MP.presence ? MP.presence[String(absSeat)] : null;
+  if(!pr) return false; /* no heartbeat yet (just joined) — give it a moment */
+  return pr.connected===false;
+}
+function mpIsViewSeatAway(viewIdx){
+  if(!MP.active || !G) return false;
+  return mpIsSeatAway(mpViewToAbs(viewIdx));
+}
+function mpSetupPresence(){
+  if(!MP.roomRef || MP.mySeat<0 || !window.firebase) return;
+  var pref=mpRef('presence/'+MP.mySeat);
+  var stamp=function(){ return (window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now(); };
+  function writeUp(){
+    if(!MP.active) return;
+    pref.set({ uid:MP.uid, name:mpMyName(), connected:true, lastSeen:stamp() }).catch(function(){});
+    try{ pref.onDisconnect().set({ uid:MP.uid, name:mpMyName(), connected:false, lastSeen:stamp() }); }catch(e){}
+  }
+  writeUp();
+  /* Reconnects (signal drop, app resumed) flip the seat back to present. */
+  try{
+    var connRef=firebase.database().ref('.info/connected');
+    var connCb=function(snap){ if(snap.val()===true) writeUp(); };
+    connRef.on('value', connCb);
+    MP.listeners.push({ref:connRef, evt:'value', cb:connCb});
+  }catch(e){}
+  if(MP._presenceTimer) clearInterval(MP._presenceTimer);
+  MP._presenceTimer=setInterval(function(){
+    if(!MP.active) return;
+    pref.update({ connected:true, lastSeen:stamp() }).catch(function(){});
+  }, 15000);
+  if(!MP._uiTimer){
+    MP._uiTimer=setInterval(function(){
+      if(!MP.active) return;
+      mpRenderPresenceUI();
+      mpCheckHostHandover();
+    }, 4000);
+  }
+  mpWatchPresence();
+}
+function mpWatchPresence(){
+  if(MP._presenceReady || !MP.roomRef) return;
+  MP._presenceReady=true;
+  mpListen(mpRef('presence'), 'value', function(snap){
+    MP.presence=snap.val()||{};
+    var now=Date.now();
+    Object.keys(MP.presence).forEach(function(k){
+      var pr=MP.presence[k];
+      if(pr && pr.connected===false){
+        if(!MP.awaySince[k]) MP.awaySince[k]=(typeof pr.lastSeen==='number' ? pr.lastSeen : now);
+      } else if(pr && pr.connected===true){
+        delete MP.awaySince[k];
+      }
+    });
+    mpRenderPresenceUI();
+    mpCheckHostHandover();
+    /* The table re-renders often; make sure away badges survive it. */
+    if(G && $('gameScreen').classList.contains('on')) renderAll();
+  });
+}
+/* Away seats across the table: banner in the game, tags in the lobby,
+   and — for the host — a Replace-with-AI button once a seat has been
+   gone about a minute. */
+var MP_AWAY_REPLACE_MS=60000, MP_HOST_GRACE_MS=7000;
+function mpAwaySeats(){
+  var out=[];
+  var count=mpTableCount();
+  for(var s=0;s<count;s++) if(mpIsSeatAway(s)) out.push(s);
+  return out;
+}
+function mpRenderPresenceUI(){
+  if(!MP.active) return;
+  mpUpdateInviteUI();
+  var bar=$('mpBar');
+  if(bar) bar.hidden = !$('gameScreen').classList.contains('on');
+  var away=mpAwaySeats();
+  var banner=$('mpAwayBanner');
+  if(banner){
+    if(!away.length) banner.textContent='';
+    else banner.textContent=away.map(function(s){
+      var info=mpSeatInfo(s);
+      return '⏳ Waiting for '+(info ? (cleanName(info.name)||'Player') : 'a player')+' to reconnect…';
+    }).join('  ');
+  }
+  var rb=$('mpReplaceBar');
+  if(rb){
+    rb.innerHTML='';
+    if(MP.isHost){
+      var now=Date.now();
+      away.forEach(function(s){
+        if(s===MP.mySeat) return;
+        var goneFor=now-(MP.awaySince[String(s)]||now);
+        if(goneFor>=MP_AWAY_REPLACE_MS){
+          var info=mpSeatInfo(s);
+          var btn=document.createElement('button');
+          btn.type='button';
+          btn.textContent='🤖 Replace '+(info ? (cleanName(info.name)||'Player') : 'player')+' with AI — away over a minute';
+          btn.addEventListener('click', function(){ mpReplaceWithAI(s); });
+          rb.appendChild(btn);
+        }
+      });
+    }
+  }
+  if($('lobbyOverlay').classList.contains('on')) mpRenderLobby();
+}
+/* Host only: hand an away seat to the computer so the game keeps moving.
+   The seat's room entry is removed (its hand goes with the host's table),
+   and if the game was waiting on that seat, the AI plays it from here. */
+function mpReplaceWithAI(absSeat){
+  if(!MP.isHost || !MP.roomRef) return;
+  var info=mpSeatInfo(absSeat);
+  var nm=info ? (cleanName(info.name)||'Player') : 'Player';
+  mpRef('players/'+absSeat).set(null).catch(function(){});
+  mpRef('presence/'+absSeat).set(null).catch(function(){});
+  mpRef('ready/'+absSeat).set(null).catch(function(){});
+  mpRef('intents/'+absSeat).set(null).catch(function(){});
+  if(MP.seats) delete MP.seats[String(absSeat)];
+  delete MP.awaySince[String(absSeat)];
+  if(G){
+    var view=mpAbsToView(absSeat);
+    var p=G.players[view];
+    if(p){
+      var handUid=p.uid;
+      p.uid=null; p.human=false; p.remote=false;
+      p.name=playerNameFor(G.count, view);
+      if(handUid && MP.roomRef) mpRef('hands/'+handUid).set(null).catch(function(){});
+      /* A replaced seat no longer blocks the Ready gate. */
+      if(G.phase==='review') mpCheckReady();
+      renderAll();
+      if(G.phase==='bidding' && G.current===view) takeBid(view);
+      else if(G.phase==='playing' && G.current===view) scheduleAI();
+    }
+  }
+  mpRenderPresenceUI();
+  toast(nm+' was replaced by the computer — the game goes on ♠');
+}
+
+/* ================= Host handover =================
+   The host's phone drives the AI seats and publishes the table. If it
+   goes away, the table would stall — so guests watch the host's
+   presence: after a short grace period (a brief signal dip shouldn't
+   trigger anything), the lowest-seat connected guest claims hosting
+   through a transaction on meta/hostUid — only one phone can win it —
+   rebuilds the table from the host's backup copy of the full game, and
+   takes over publishing and driving the AI seats. Everyone else just
+   sees the new host and keeps playing. */
+function mpHostSeat(){
+  var count=mpTableCount();
+  for(var s=0;s<count;s++){
+    var info=mpSeatInfo(s);
+    if(info && MP.hostUid && info.uid===MP.hostUid) return s;
+  }
+  return 0;
+}
+function mpCheckHostHandover(){
+  if(!MP.active || MP.isHost || !MP.roomRef) return;
+  if(!MP.meta || MP.meta.status!=='playing') return;
+  var hs=mpHostSeat();
+  if(hs===MP.mySeat) return;
+  if(!mpIsSeatAway(hs)) return;
+  var since=MP.awaySince[String(hs)]||0;
+  if(!since || Date.now()-since < MP_HOST_GRACE_MS) return;
+  /* Election: the lowest-seat connected human claims hosting. If that
+     isn't me, wait — the periodic check re-runs, and if the claimant
+     also vanished, the next seat down takes its turn. */
+  var count=mpTableCount(), candidate=-1;
+  for(var s=0;s<count;s++){
+    if(s===hs) continue;
+    var info=mpSeatInfo(s);
+    if(info && !mpIsSeatAway(s)){ candidate=s; break; }
+  }
+  if(candidate!==MP.mySeat) return;
+  mpAttemptTakeover();
+}
+function mpAttemptTakeover(){
+  if(MP._takeoverBusy || MP.isHost || !MP.roomRef) return;
+  MP._takeoverBusy=true;
+  var oldHost=MP.hostUid;
+  /* Fetch the backup first: only claim hosting if this phone can
+     actually rebuild the exact table from it. */
+  mpRef('hostBackup').once('value').then(function(snap){
+    var backup=snap.val();
+    if(!backup || !backup.absPlayers){ MP._takeoverBusy=false; return; }
+    return mpRef('meta/hostUid').transaction(function(cur){
+      if(cur!==oldHost) return undefined; /* someone else already took over */
+      return MP.uid;
+    }).then(function(res){
+      MP._takeoverBusy=false;
+      if(!res || !res.committed) return;
+      MP.hostUid=MP.uid;
+      if(MP.meta) MP.meta.hostUid=MP.uid;
+      mpBecomeHost(backup);
+    });
+  }).catch(function(){ MP._takeoverBusy=false; });
+}
+/* Rebuild an authoritative table on this phone and start hosting it:
+   used by host handover, and by the original host reopening mid-game. */
+function mpBecomeHost(backup){
+  var rebuilt=mpRebuildFromBackup(backup);
+  /* Hosting is only ever rebuilt from the room's backup — never from an
+     unrelated (solo) game that happens to be on this phone. */
+  if(!rebuilt) return false;
+  MP.isHost=true;
+  MP._allReady=false;
+  closeAll();
+  $('startScreen').classList.remove('on');
+  $('gameScreen').classList.add('on');
+  mpWatchHostIntents();
+  renderAll();
+  mpHostSync();
+  mpRenderPresenceUI();
+  /* Drive whatever the table was waiting on: takeBid handles every case —
+     an AI bid, the local bid sheet, or waiting on a friend's phone. */
+  if(G && G.phase==='bidding' && G.current>=0 && G.players[G.current]) takeBid(G.current);
+  else if(G && G.phase==='playing') scheduleAI();
+  else if(G && G.phase==='review') mpCheckReady();
+  toast('You\'re hosting the table now — the game keeps going ♠');
+  setMsg('<b>'+mpMyName()+'</b> is hosting the table now — play continues.');
+  mpHostSync();
+  return true;
+}
+/* The host keeps a full backup of the game (every hand included) in the
+   room, so a new host can rebuild the exact table — who holds what —
+   instead of guessing. Rebuilding rotates the absolute seats into this
+   phone's view, where the local player is always index 0. */
+function mpSerializeBackup(){
+  if(!G) return null;
+  var absPlayers=[];
+  for(var v=0;v<G.count;v++){
+    var abs=mpViewToAbs(v), p=G.players[v];
+    absPlayers[abs]={ name:p.name, uid:p.uid||null, hand:p.hand, bid:p.bid, tricks:p.tricks, score:p.score };
+  }
+  var teamScores=G.teamScores;
+  if(G.count===4 && MP.mySeat%2===1) teamScores=[G.teamScores[1],G.teamScores[0]];
+  return {
+    count:G.count, scoringMode:G.scoringMode, phase:G.phase,
+    dealer:mpViewToAbs(G.dealer), current:mpViewToAbs(G.current), leader:mpViewToAbs(G.leader),
+    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
+    teamScores:teamScores, absPlayers:absPlayers,
+    trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; })
+  };
+}
+function mpRebuildFromBackup(backup){
+  if(!backup || !backup.absPlayers || !backup.count) return false;
+  var count=backup.count;
+  var players=[];
+  MP._unknownHands={};
+  /* Local seat maths with the backup's own count — G may still hold a
+     mirror (or a solo game) while this runs, so don't lean on it. */
+  var toAbs=function(v){ return (((v+MP.mySeat)%count)+count)%count; };
+  var toView=function(a){ return (((a-MP.mySeat)%count)+count)%count; };
+  for(var v=0;v<count;v++){
+    var abs=toAbs(v);
+    var src=backup.absPlayers[abs]||{name:'Player',hand:[],bid:null,tricks:0,score:0};
+    var seatInfo=mpSeatInfo(abs);
+    var uid=seatInfo ? seatInfo.uid : (src.uid||null);
+    var hand=(src.hand||[]).slice();
+    players.push({
+      name: seatInfo ? (cleanName(seatInfo.name)||'Player') : (cleanName(src.name||'')||playerNameFor(count, v)),
+      human: !!uid, remote: !!uid && uid!==MP.uid, uid: uid,
+      hand: hand, bid:(src.bid===undefined?null:src.bid), tricks:src.tricks||0, score:src.score||0
+    });
+  }
+  var teamScores=backup.teamScores||[0,0];
+  if(count===4 && MP.mySeat%2===1) teamScores=[teamScores[1],teamScores[0]];
+  epoch++;
+  G={
+    count:count, players:players,
+    dealer:toView(backup.dealer), teamScores:teamScores,
+    phase:backup.phase, trick:(backup.trick||[]).map(function(t){ return { p:toView(t.p), card:t.card }; }),
+    current:toView(backup.current), leader:toView(backup.leader),
+    trickNo:backup.trickNo, cardsPer:backup.cardsPer, handNo:backup.handNo,
+    over:!!backup.over, scoringMode:backup.scoringMode, bidQueue:[]
+  };
+  /* If bidding was mid-flight, rebuild the remaining bid queue so play
+     resumes with whoever still owes a bid. */
+  if(G.phase==='bidding'){
+    var start=(G.dealer+1)%G.count;
+    for(var k=0;k<G.count;k++){
+      var idx=(start+k)%G.count;
+      if(G.players[idx].bid===null && idx!==G.current) G.bidQueue.push(idx);
+    }
+    G.bidQueue.sort(function(a,b){
+      var da=(a-G.current+G.count)%G.count, db=(b-G.current+G.count)%G.count;
+      return da-db;
+    });
+  }
+  return true;
+}
+
+/* ---- Lazy SDK loading, guarded: any failure leaves solo play untouched ---- */
+var mpSdkPromise=null;
+function mpLoadSdk(){
+  if(window.firebase && window.firebase.database) return Promise.resolve();
+  if(mpSdkPromise) return mpSdkPromise;
+  var base='https://www.gstatic.com/firebasejs/10.12.2/';
+  var files=['firebase-app-compat.js','firebase-auth-compat.js','firebase-database-compat.js'];
+  mpSdkPromise=files.reduce(function(chain, f){
+    return chain.then(function(){
+      return new Promise(function(res, rej){
+        var sc=document.createElement('script');
+        sc.src=base+f; sc.async=false;
+        sc.onload=function(){ res(); };
+        sc.onerror=function(){ rej(new Error('sdk')); };
+        document.head.appendChild(sc);
+      });
+    });
+  }, Promise.resolve()).then(function(){
+    if(!(window.firebase && window.firebase.database)) throw new Error('sdk');
+  });
+  return mpSdkPromise;
+}
+function mpConnect(){
+  return mpLoadSdk().then(function(){
+    if(!MP.db){
+      var app;
+      try{ app=firebase.app(); }catch(e){ app=firebase.initializeApp(FIREBASE_CONFIG); }
+      MP.db=firebase.database();
+    }
+    var auth=firebase.auth();
+    if(auth.currentUser){ MP.uid=auth.currentUser.uid; return MP.uid; }
+    return auth.signInAnonymously().then(function(cred){ MP.uid=cred.user.uid; return MP.uid; });
+  });
+}
+function mpRef(path){ return MP.db.ref('rooms/'+MP.code+(path?'/'+path:'')); }
+function mpListen(ref, evt, cb){
+  ref.on(evt, cb);
+  MP.listeners.push({ref:ref, evt:evt, cb:cb});
+}
+function mpDetach(){
+  MP.listeners.forEach(function(l){ try{ l.ref.off(l.evt, l.cb); }catch(e){} });
+  MP.listeners=[];
+}
+
+/* ---- Room codes: 4 letters, claimed atomically so hosts can't collide ---- */
+function mpGenCode(){
+  var letters='ABCDEFGHJKMNPQRSTUVWXYZ'; /* no I, L, O — easy to read aloud */
+  var c='';
+  for(var i=0;i<4;i++) c+=letters.charAt(Math.floor(Math.random()*letters.length));
+  return c;
+}
+function mpClaimCode(attempt){
+  attempt=attempt||0;
+  var code=mpGenCode();
+  var meta={ hostUid:MP.uid, count:selectedCount, scoringMode:selectedScoring, status:'lobby', createdAt:Date.now() };
+  var seed={ meta:meta, players:{} };
+  seed.players['0']={ uid:MP.uid, name:mpMyName() };
+  return MP.db.ref('rooms/'+code).transaction(function(cur){
+    if(cur!==null) return undefined; /* taken — abort and try another code */
+    return seed;
+  }).then(function(res){
+    if(res && res.committed) return code;
+    if(attempt>=7) throw new Error('codes');
+    return mpClaimCode(attempt+1);
+  });
+}
+
+/* ---- Create / join ---- */
+function mpCreate(){
+  mpSetStatus('Connecting…');
+  mpConnect().then(function(){
+    return mpClaimCode();
+  }).then(function(code){
+    MP.active=true; MP.isHost=true; MP.code=code; MP.mySeat=0;
+    MP.roomRef=MP.db.ref('rooms/'+code);
+    MP.meta={ hostUid:MP.uid, count:selectedCount, scoringMode:selectedScoring, status:'lobby' };
+    MP.hostUid=MP.uid;
+    MP.seats={ '0':{ uid:MP.uid, name:mpMyName() } };
+    setScoringMode(selectedScoring, true);
+    mpSetStatus('');
+    mpSaveSession();
+    mpEnterLobby();
+    mpWatchLobby();
+    mpSetupPresence();
+  }).catch(function(){
+    mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+function mpJoin(code){
+  code=(code||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
+  if(code.length!==4){ mpSetStatus('A room code is 4 letters — check the code and try again.'); return; }
+  mpSetStatus('Connecting…');
+  mpConnect().then(function(){
+    var ref=MP.db.ref('rooms/'+code);
+    return ref.child('meta').once('value').then(function(snap){
+      var meta=snap.val();
+      if(!meta || meta.status==='closed') throw new Error('noroom');
+      return ref.child('players').once('value').then(function(psnap){
+        var players=psnap.val()||{};
+        /* Reconnect: if this phone already holds a seat, it keeps that
+           exact seat — even mid-game — and its hand is still in the room
+           waiting for it. Only brand-new visitors are turned away from a
+           game already in progress. */
+        var mySeat=-1;
+        Object.keys(players).forEach(function(k){ if(players[k] && players[k].uid===MP.uid) mySeat=parseInt(k,10); });
+        var rejoin = mySeat>=0;
+        if(!rejoin && meta.status!=='lobby') throw new Error('started');
+        if(mySeat<0){
+          for(var s=0;s<meta.count;s++){ if(!players[String(s)]){ mySeat=s; break; } }
+        }
+        if(mySeat<0) throw new Error('full');
+        var entry={}; entry[String(mySeat)]={ uid:MP.uid, name:mpMyName() };
+        return ref.child('players').update(entry).then(function(){
+          MP.active=true; MP.code=code; MP.mySeat=mySeat;
+          MP.roomRef=ref; MP.meta=meta; MP.hostUid=meta.hostUid||null;
+          MP.seats=players; MP.seats[String(mySeat)]=entry[String(mySeat)];
+          /* Hosting belongs to whoever meta/hostUid names — normally the
+             creator, but after a handover it's the player who took over.
+             The original host reopening after a handover rejoins as a
+             regular player at their own seat. */
+          MP.isHost = (meta.hostUid===MP.uid);
+          selectedCount=meta.count;
+          if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
+          mpSetStatus('');
+          mpSaveSession();
+          mpWatchLobby();
+          mpSetupPresence();
+          if(meta.status==='playing'){
+            if(MP.isHost){
+              /* The host is back before any handover: rebuild the exact
+                 table from its backup and carry on hosting it. */
+              return mpRef('hostBackup').once('value').then(function(bsnap){
+                if(mpBecomeHost(bsnap.val())){
+                  toast('Welcome back — your seat and cards were kept for you ♠');
+                } else {
+                  /* No backup to rebuild hosting from (a table started
+                     before backups existed): rejoin as a player at the
+                     same seat — seat and hand are still exact. */
+                  MP.isHost=false;
+                  mpWatchGuestGame();
+                  closeAll();
+                  toast('Welcome back — your seat and cards were kept for you ♠');
+                }
+              });
+            }
+            mpWatchGuestGame();
+            closeAll();
+            toast(rejoin ? 'Welcome back — your seat and cards were kept for you ♠' : 'You joined a game in progress ♠');
+            return;
+          }
+          mpEnterLobby();
+          if(!MP.isHost) mpWatchGuestGame();
+          if(rejoin) toast('Welcome back — same seat as before ♠');
+        });
+      });
+    });
+  }).catch(function(err){
+    var m=(err && err.message)||'';
+    if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
+    else if(m==='started') mpSetStatus('That table has already started playing. Ask the host for a new table.');
+    else if(m==='full') mpSetStatus('That table is full.');
+    else mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+  });
+}
+
+/* ---- Lobby ---- */
+function mpEnterLobby(){
+  closeAll();
+  $('lobbyCode').textContent=MP.code;
+  $('lobbyLink').textContent=MP_LIVE_BASE+'?room='+MP.code;
+  $('lobbySub').textContent = MP.isHost
+    ? 'Share this code — or send the link — and your friends tap straight into this table. Seats nobody takes are played by the computer.'
+    : 'You\'re in! When the host starts the game, your cards appear here. Seats nobody takes are played by the computer.';
+  $('lobbyStartBtn').style.display = MP.isHost ? 'block' : 'none';
+  $('lobbyOverlay').classList.add('on');
+  mpUpdateInviteUI();
+  mpRenderLobby();
+}
+function mpRenderLobby(){
+  var wrap=$('lobbyPlayers'); if(!wrap) return;
+  wrap.innerHTML='';
+  var count=(MP.meta && MP.meta.count) || selectedCount;
+  var humans=0;
+  for(var s=0;s<count;s++){
+    var info=MP.seats ? MP.seats[String(s)] : null;
+    var seatAway=info ? mpIsSeatAway(s) : false;
+    var div=document.createElement('div');
+    div.className='mp-player'+(info?'':' empty')+(seatAway?' away':'');
+    /* Names come from other people's phones via the database — always
+       render them as text, never as markup. */
+    var nm=document.createElement('span');
+    var tg=document.createElement('span'); tg.className='tag'+(seatAway?' away':'');
+    if(info){
+      humans++;
+      nm.textContent=(cleanName(info.name)||'Player')+(info.uid===MP.uid?' (you)':'');
+      tg.textContent= seatAway ? ('⏳ Away — waiting to reconnect') : ((MP.hostUid && info.uid===MP.hostUid)?'Host':'Seat '+(s+1));
+    } else {
+      nm.textContent='Computer player';
+      tg.textContent='Seat '+(s+1)+' · filled by AI';
+    }
+    div.appendChild(nm); div.appendChild(tg);
+    wrap.appendChild(div);
+  }
+  mpSetLobbyStatus(humans<=1
+    ? 'Just you so far — friends who join appear here. You can start any time; the computer fills the rest.'
+    : humans+' players at the table. '+(MP.isHost?'Tap Start when everyone is in.':'Waiting for the host to start…'));
+}
+function mpWatchLobby(){
+  mpListen(mpRef('players'), 'value', function(snap){
+    MP.seats=snap.val()||{};
+    /* Sanitize every remote name the moment it arrives from the database. */
+    Object.keys(MP.seats).forEach(function(k){
+      if(MP.seats[k]) MP.seats[k].name=cleanName(MP.seats[k].name||'')||'Player';
+    });
+    if($('lobbyOverlay').classList.contains('on')) mpRenderLobby();
+  });
+  mpListen(mpRef('meta/status'), 'value', function(snap){
+    if(snap.val()==='playing' && MP.meta) MP.meta.status='playing';
+    if(snap.val()==='playing' && !MP.isHost && $('lobbyOverlay').classList.contains('on')){
+      /* Host started: the public-state watcher takes the guest to the table. */
+      mpSetLobbyStatus('The host started the game — dealing your cards…');
+    }
+  });
+  /* Host handover shows up here: meta/hostUid changes to the player who
+     took over. Everyone notes the new host; play itself never pauses. */
+  mpListen(mpRef('meta/hostUid'), 'value', function(snap){
+    var hu=snap.val();
+    if(!hu) return;
+    var changed = MP.hostUid && MP.hostUid!==hu;
+    MP.hostUid=hu;
+    if(MP.meta) MP.meta.hostUid=hu;
+    if(changed && MP.active && !MP.isHost){
+      var hs=mpSeatInfo(mpHostSeat());
+      toast((hs ? (cleanName(hs.name)||'Another player') : 'Another player')+' is hosting the table now ♠');
+      mpRenderPresenceUI();
+    }
+  });
+}
+function mpHostStart(){
+  if(!MP.isHost || !MP.roomRef) return;
+  mpRef('meta/status').set('playing');
+  if(MP.meta) MP.meta.status='playing';
+  $('lobbyOverlay').classList.remove('on');
+  startGame(MP.meta.count);
+  mpWatchHostIntents();
+  mpSaveSession();
+  mpRenderPresenceUI();
+  toast('Table started — friends\' phones are dealt in ♠');
+}
+
+/* ---- Host: publish the table, private hands, and act on intents ---- */
+function mpPublicState(){
+  /* The room speaks in absolute seats; the engine speaks in this phone's
+     view (local player = 0). For the original host they're identical —
+     for a host who took over from another seat, translate on the way out
+     (guests translate back on the way in, as they always have). */
+  var players=[];
+  G.players.forEach(function(p, v){
+    players[mpViewToAbs(v)]={ name:p.name, uid:p.uid||null, bid:p.bid, tricks:p.tricks, score:p.score, handCount:p.hand.length };
+  });
+  var teamScores=G.teamScores;
+  if(G.count===4 && MP.mySeat%2===1) teamScores=[G.teamScores[1],G.teamScores[0]];
+  var pub={
+    count:G.count, scoringMode:G.scoringMode, phase:G.phase,
+    dealer:mpViewToAbs(G.dealer), current:mpViewToAbs(G.current), leader:mpViewToAbs(G.leader),
+    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
+    teamScores:teamScores, players:players, hostUid:MP.uid,
+    trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; }),
+    msg:$('msg').innerHTML
+  };
+  if(G.phase==='scoring'){
+    pub.result={ title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:'Waiting for the host…' };
+  }
+  return pub;
+}
+function mpHostSync(){
+  if(!G || !MP.roomRef) return;
+  var pub=mpPublicState();
+  var pubJson=JSON.stringify(pub);
+  if(pubJson!==MP.lastPubJson){
+    MP.lastPubJson=pubJson;
+    mpRef('public').set(pub).catch(function(){});
+  }
+  /* Private hands: one node per player uid, holding only their cards. */
+  var hands={};
+  G.players.forEach(function(p){ if(p.uid) hands[p.uid]=p.hand; });
+  var handsJson=JSON.stringify(hands);
+  if(handsJson!==MP.lastHandsJson){
+    MP.lastHandsJson=handsJson;
+    Object.keys(hands).forEach(function(uid){
+      mpRef('hands/'+uid).set(hands[uid]).catch(function(){});
+    });
+  }
+  /* Host backup: the full game, every hand included, kept in the room so
+     another phone can take over hosting mid-game without losing a card.
+     Written on the same change cadence as the public state. */
+  var backup=mpSerializeBackup();
+  var backupJson=JSON.stringify(backup);
+  if(backup && backupJson!==MP.lastBackupJson){
+    MP.lastBackupJson=backupJson;
+    mpRef('hostBackup').set(backup).catch(function(){});
+  }
+}
+function mpResetReady(){
+  MP.readyMap={}; MP._allReady=false; MP._readySent=false;
+  if(MP.roomRef) mpRef('ready').set(null).catch(function(){});
+  mpListenReady();
+}
+var mpReadyListening=false;
+function mpListenReady(){
+  if(mpReadyListening || !MP.isHost) return;
+  mpReadyListening=true;
+  mpListen(mpRef('ready'), 'value', function(snap){
+    MP.readyMap=snap.val()||{};
+    mpCheckReady();
+  });
+}
+function mpHumanSeats(){
+  var out=[];
+  if(!G) return out;
+  G.players.forEach(function(p,i){ if(p.uid) out.push(i); });
+  return out;
+}
+function mpCheckReady(){
+  if(!MP.isHost || !G || G.phase!=='review' || MP._allReady) return;
+  var seats=mpHumanSeats();
+  if(!seats.length) return;
+  /* The ready map is keyed by absolute seat; human seats here are view
+     indices, so translate before checking. Away seats still count — they
+     unblock when they reconnect, or when the host replaces them with AI
+     (mpReplaceWithAI re-runs this check). */
+  var all=seats.every(function(s){ return MP.readyMap[String(mpViewToAbs(s))]===G.handNo; });
+  if(all){
+    MP._allReady=true;
+    startBidding();
+  }
+}
+function mpHostReady(){
+  if(!MP.roomRef || !G) return;
+  MP.readyMap[String(MP.mySeat)]=G.handNo;
+  var w={}; w[String(MP.mySeat)]=G.handNo;
+  mpRef('ready').update(w).catch(function(){});
+  mpListenReady();
+  mpCheckReady();
+}
+function mpWatchHostIntents(){
+  mpListen(mpRef('intents'), 'value', function(snap){
+    var all=snap.val()||{};
+    Object.keys(all).forEach(function(seatKey){
+      var intent=all[seatKey];
+      if(!intent || !intent.id || MP._processedIntents[intent.id]) return;
+      MP._processedIntents[intent.id]=true;
+      mpRef('intents/'+seatKey).set(null).catch(function(){});
+      mpApplyIntent(parseInt(seatKey,10), intent);
+    });
+  });
+  mpListenReady();
+}
+function mpApplyIntent(absSeat, intent){
+  if(!G) return;
+  /* Intents arrive keyed by absolute seat; the engine wants a view index. */
+  var seat=mpAbsToView(absSeat);
+  var p=G.players[seat];
+  if(!p || !p.remote) return; /* only friends' phones may move their seats */
+  if(intent.type==='bid'){
+    if(G.phase!=='bidding' || G.current!==seat || p.bid!==null) return;
+    var bv=parseInt(intent.value,10);
+    if(isNaN(bv) || bv<0 || bv>G.cardsPer) return; /* bids are numbers in range, nothing else */
+    p.bid=bv;
+    setMsg('<b>'+p.name+'</b> bids '+(bv===0?'<b>Nil</b>':'<b>'+bv+'</b>')+'.');
+    renderAll(); nextBid();
+  } else if(intent.type==='play'){
+    if(G.phase!=='playing' || G.current!==seat || !intent.card) return;
+    var card=p.hand.filter(function(c){ return c.suit===intent.card.suit && c.rank===intent.card.rank; })[0];
+    if(card) playCard(seat, card);
+  }
+}
+
+/* ---- Guest: send moves, mirror the room ---- */
+function mpSendIntent(intent){
+  if(!MP.roomRef) return;
+  intent.id=MP.uid+'-'+Date.now()+'-'+(++MP._intentSeq);
+  intent.seat=MP.mySeat;
+  var w={}; w[String(MP.mySeat)]=intent;
+  mpRef('intents').update(w).catch(function(){ toast('That move did not reach the table — check your connection.'); });
+}
+function mpGuestReady(){
+  if(MP._readySent || !MP.roomRef || !G) return;
+  MP._readySent=true;
+  var w={}; w[String(MP.mySeat)]=G.handNo;
+  mpRef('ready').update(w).catch(function(){});
+  var rb=$('reviewBar'); if(rb) rb.hidden=true;
+  setMsg('You\'re ready — <b>waiting for the rest of the table</b> to look over their cards…');
+}
+function mpWatchGuestGame(){
+  mpListen(mpRef('hands/'+MP.uid), 'value', function(snap){
+    MP.myCards=snap.val()||[];
+    /* Firebase stores arrays as objects when indices gap — normalise. */
+    if(MP.myCards && !Array.isArray(MP.myCards)){
+      var arr=[]; Object.keys(MP.myCards).forEach(function(k){ arr[parseInt(k,10)]=MP.myCards[k]; });
+      MP.myCards=arr.filter(function(c){ return !!c; });
+    }
+    if(MP.lastPub) mpApplyPublic(MP.lastPub);
+  });
+  mpListen(mpRef('public'), 'value', function(snap){
+    var pub=snap.val();
+    if(!pub) return;
+    MP.lastPub=pub;
+    mpApplyPublic(pub);
+  });
+}
+function mpApplyPublic(pub){
+  if(!MP.active || MP.isHost) return;
+  if(pub.hostUid) MP.hostUid=pub.hostUid;
+  var count=pub.count, mySeat=MP.mySeat;
+  var rot=function(abs){ return (abs-mySeat+count)%count; };
+  var players=[];
+  for(var v=0;v<count;v++){
+    var abs=(v+mySeat)%count;
+    var src=pub.players[abs]||{name:'Player',bid:null,tricks:0,score:0,handCount:0};
+    var hand;
+    if(v===0){ hand=MP.myCards.slice(); }
+    else { hand=[]; for(var d=0;d<(src.handCount||0);d++) hand.push({suit:'c',rank:2}); }
+    players.push({ name:cleanName(src.name||'')||'Player', human:v===0, hand:hand, bid:(src.bid===undefined?null:src.bid), tricks:src.tricks||0, score:src.score||0 });
+  }
+  var teamScores=pub.teamScores||[0,0];
+  if(count===4 && mySeat%2===1) teamScores=[teamScores[1],teamScores[0]];
+  epoch++;
+  G={
+    count:count, players:players, dealer:rot(pub.dealer), teamScores:teamScores,
+    phase:pub.phase, trick:(pub.trick||[]).map(function(t){ return { p:rot(t.p), card:t.card }; }),
+    current:rot(pub.current), leader:rot(pub.leader), trickNo:pub.trickNo,
+    cardsPer:pub.cardsPer, handNo:pub.handNo, over:!!pub.over, scoringMode:pub.scoringMode,
+    bidQueue:[]
+  };
+  if(pub.phase!=='review') MP._readySent=false;
+  setGameActive(true);
+  $('startScreen').classList.remove('on');
+  $('gameScreen').classList.add('on');
+  if($('lobbyOverlay').classList.contains('on')) $('lobbyOverlay').classList.remove('on');
+  renderAll();
+  mpRenderPresenceUI();
+  if(pub.msg) setMsg(mpSanitizeHtml(pub.msg));
+  /* My bid: open the bid sheet when the room says it's my turn to bid. */
+  if(pub.phase==='bidding' && pub.current===mySeat && G.players[0].bid===null){
+    var key=pub.handNo+'-'+pub.trickNo+'-'+Object.keys(MP._processedIntents).length+'-'+pub.current;
+    if(MP._bidShownKey!==pub.handNo+'-bid-'+mySeat || !$('bidOverlay').classList.contains('on')){
+      MP._bidShownKey=pub.handNo+'-bid-'+mySeat;
+      showBidUI();
+    }
+  } else if(pub.phase!=='bidding' && $('bidOverlay').classList.contains('on')){
+    $('bidOverlay').classList.remove('on');
+    MP._bidShownKey='';
+  }
+  /* Hand result: mirror the host's score sheet. */
+  if(pub.phase==='scoring' && pub.result){
+    var rkey=pub.handNo+'-result';
+    if(MP._resultShownKey!==rkey){
+      MP._resultShownKey=rkey;
+      $('resultTitle').textContent=pub.result.title;
+      $('resultBody').innerHTML=mpSanitizeHtml(pub.result.body);
+      $('resultBtn').textContent='Waiting for the host to deal…';
+      $('resultOverlay').classList.add('on');
+    }
+  } else if(pub.phase!=='scoring' && $('resultOverlay').classList.contains('on')){
+    $('resultOverlay').classList.remove('on');
+    MP._resultShownKey='';
+  }
+}
+
+/* ---- Leaving ---- */
+function mpLeaveTable(){
+  try{
+    if(MP.roomRef && MP.mySeat>=0){
+      /* Leaving on purpose is not "away": drop the presence heartbeat so
+         nobody waits on a seat that isn't coming back. */
+      var pref=mpRef('presence/'+MP.mySeat);
+      try{ pref.onDisconnect().cancel(); }catch(e){}
+      pref.set(null).catch(function(){});
+      if(MP.meta && MP.meta.status==='lobby'){
+        mpRef('players/'+MP.mySeat).set(null).catch(function(){});
+        if(MP.isHost) mpRef('meta/status').set('closed').catch(function(){});
+      }
+    }
+  }catch(e){}
+  if(MP._presenceTimer){ clearInterval(MP._presenceTimer); MP._presenceTimer=null; }
+  if(MP._uiTimer){ clearInterval(MP._uiTimer); MP._uiTimer=null; }
+  mpDetach();
+  mpClearSession();
+  MP.active=false; MP.isHost=false; MP.code=null; MP.mySeat=-1; MP.seats=null;
+  MP.lastPub=null; MP.lastPubJson=''; MP.lastHandsJson=''; MP.lastBackupJson=''; MP._readySent=false; MP._allReady=false;
+  MP.presence={}; MP.awaySince={}; MP.hostUid=null; MP._presenceReady=false; MP._takeoverBusy=false; MP._unknownHands={};
+  mpReadyListening=false;
+  var bar=$('mpBar'); if(bar) bar.hidden=true;
+}
+
+/* ---- Wiring ---- */
+$('mpBtn').addEventListener('click', function(){
+  closeAll();
+  /* Sync the multiplayer pickers with the start-screen choices. */
+  document.querySelectorAll('#mpCountSeg button').forEach(function(b){ b.classList.toggle('sel', parseInt(b.getAttribute('data-n'),10)===selectedCount); });
+  document.querySelectorAll('#mpScoreSeg button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-mode')===selectedScoring); });
+  mpSetStatus('');
+  $('mpOverlay').classList.add('on');
+});
+$('mpCloseBtn').addEventListener('click', closeAll);
+document.querySelectorAll('#mpCountSeg button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('#mpCountSeg button').forEach(function(b){ b.classList.remove('sel'); });
+    btn.classList.add('sel');
+    selectedCount=parseInt(btn.getAttribute('data-n'),10);
+    document.querySelectorAll('#countSeg button').forEach(function(b){ b.classList.toggle('sel', parseInt(b.getAttribute('data-n'),10)===selectedCount); });
+    $('countExplain').textContent=EXPLAINS[selectedCount];
+    saveSettings(); beep(600,0.05,0.04);
+  });
+});
+document.querySelectorAll('#mpScoreSeg button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('#mpScoreSeg button').forEach(function(b){ b.classList.remove('sel'); });
+    btn.classList.add('sel');
+    setScoringMode(btn.getAttribute('data-mode'), true);
+    saveSettings(); beep(600,0.05,0.04);
+  });
+});
+$('mpCreateBtn').addEventListener('click', mpCreate);
+$('mpJoinBtn').addEventListener('click', function(){ mpJoin($('mpJoinInput').value); });
+$('mpJoinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpJoin($('mpJoinInput').value); });
+$('lobbyStartBtn').addEventListener('click', mpHostStart);
+$('lobbyInviteBtn').addEventListener('click', mpInvite);
+$('mpInviteBtn2').addEventListener('click', mpInvite);
+$('lobbyLeaveBtn').addEventListener('click', function(){ mpLeaveTable(); backToStart(); toast('You left the table.'); });
+$('lobbyCopyBtn').addEventListener('click', function(){
+  var link=MP_LIVE_BASE+'?room='+MP.code;
+  function done(){ toast('Join link copied — send it to your friends ♠'); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(link).then(done, function(){ toast('Your table code is '+MP.code+' — the link is shown above.'); });
+  } else {
+    toast('Your table code is '+MP.code+' — the link is shown above.');
+  }
+});
+/* Auto-join: opening a ?room=CODE link goes straight to that table.
+   With no link, a remembered session (this phone was at a table when the
+   app closed) reconnects to the same seat instead — the room kept the
+   seat and the hand, and the uid on this device finds them again. */
+(function(){
+  var code=new URLSearchParams(location.search).get('room');
+  if(!code){
+    var sess=mpLoadSession();
+    if(sess && sess.code){
+      code=sess.code;
+      closeAll();
+      $('mpJoinInput').value=code;
+      $('mpOverlay').classList.add('on');
+      mpSetStatus('Reconnecting to your table '+code+' — your seat was kept for you…');
+      mpJoin(code);
+      /* If the table is gone (finished, or the seat was replaced after a
+         long absence), don't strand the player on this sheet. */
+      setTimeout(function(){
+        if(!MP.active){
+          mpClearSession();
+          closeAll();
+          toast('That table has finished — start or join a new one ♠');
+        }
+      }, 9000);
+    }
+    return;
+  }
+  code=code.toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
+  if(code.length!==4) return;
+  closeAll();
+  $('mpJoinInput').value=code;
+  $('mpOverlay').classList.add('on');
+  mpSetStatus('Joining table '+code+'…');
+  mpJoin(code);
+})();
 </script>
 </body>
 </html>
