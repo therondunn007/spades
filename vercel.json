@@ -1,1 +1,1 @@
-{"headers":[{"headers":[{"key":"Cache-Control","value":"no-cache, no-store, must-revalidate"}],"source":"/(index.html|sw.js|manifest.webmanifest)"},{"headers":[{"key":"Cache-Control","value":"no-cache, no-store, must-revalidate"}],"source":"/"}]}
+{"crons":[{"path":"/api/cleanup","schedule":"0 9 * * *"}],"headers":[{"headers":[{"key":"Cache-Control","value":"no-cache, no-store, must-revalidate"}],"source":"/(index.html|sw.js|manifest.webmanifest)"},{"headers":[{"key":"Cache-Control","value":"no-cache, no-store, must-revalidate"}],"source":"/"}]}
