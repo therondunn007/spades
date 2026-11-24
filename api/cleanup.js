@@ -35,12 +35,22 @@ module.exports = async (req, res) => {
       // Newest sign of human life: any presence heartbeat, else room creation.
       let lastSeen = typeof meta.createdAt === 'number' ? meta.createdAt : 0;
       const presence = room.presence || {};
-      for (const seat of Object.keys(presence)) {
+      const presenceSeats = Object.keys(presence);
+      for (const seat of presenceSeats) {
         const ls = presence[seat] && presence[seat].lastSeen;
         if (typeof ls === 'number' && ls > lastSeen) lastSeen = ls;
       }
-      // No usable timestamp at all (room mid-creation): leave it alone.
-      if (!lastSeen) { kept.push(code); continue; }
+      if (!lastSeen) {
+        // No timestamp anywhere. A room with anyone present may be
+        // mid-creation, so leave it; a room with no presence at all and
+        // no creation time is abandoned debris (e.g. a failed create
+        // that left only a hands node) — delete it.
+        if (presenceSeats.length > 0) { kept.push(code); continue; }
+        await db.ref('rooms/' + code).remove();
+        deleted.push(code);
+        console.log('cleanup: deleted room with no meta or presence ' + code);
+        continue;
+      }
       if (now - lastSeen > STALE_MS) {
         await db.ref('rooms/' + code).remove();
         deleted.push(code);
