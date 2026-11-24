@@ -374,6 +374,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
       <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
       <button id="soundBtn"><span>🔊 Sound</span><span class="hint" id="soundHint">on</span></button>
+      <button id="notifyBtn"><span>🔔 Table notifications</span><span class="hint" id="notifyHint">off</span></button>
       <button id="closeMenuBtn"><span>✕ Close menu</span><span class="hint"></span></button>
     </div>
   </div>
@@ -596,6 +597,28 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <p class="small muted" id="frTableNote" style="margin-top:10px">To invite a friend to a table, create or join one first — then each friend gets an <b>Invite to my table</b> button here, in the lobby, and from the Friends button at the table.</p>
 
     <button class="ghost-btn" id="frCloseBtn">Done</button>
+  </div>
+</div>
+
+<!-- ============ TABLE NOTIFICATIONS: PERMISSION ASK ============ -->
+<div class="overlay" id="notifyOverlay" role="dialog" aria-modal="true" aria-label="Table notifications">
+  <div class="sheet">
+    <h2>🔔 Table notifications</h2>
+    <p class="small muted">Get a pop-up when someone joins your table — even if the app is closed. Tap the pop-up and you're taken straight to the table.</p>
+    <button class="big-btn" id="notifyAllowBtn">Allow notifications</button>
+    <button class="ghost-btn" id="notifyLaterBtn">Not now</button>
+    <p class="small muted" style="text-align:center;margin:9px 0 0">You can turn this on or off any time in Menu → Table notifications.</p>
+  </div>
+</div>
+
+<!-- ============ JOIN AS: TEAMMATE OR OPPONENT ============ -->
+<div class="overlay" id="joinAsOverlay" role="dialog" aria-modal="true" aria-label="Join as teammate or opponent">
+  <div class="sheet">
+    <h2>Join as…</h2>
+    <p class="small muted" id="joinAsSub">This is a partners table. Sit across from the host as their teammate, or beside the host as an opponent.</p>
+    <button class="big-btn" id="joinAsTeamBtn">🤝 Teammate — sit across from the host</button>
+    <button class="big-btn" id="joinAsOppBtn" style="background:var(--btn2);color:#fff">⚔ Opponent — sit beside the host</button>
+    <button class="ghost-btn" id="joinAsAnyBtn">Either seat is fine</button>
   </div>
 </div>
 
@@ -1381,7 +1404,7 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
@@ -1477,7 +1500,7 @@ document.querySelectorAll('.deck-option').forEach(function(btn){
 });
 setDeck('classic', true);
 document.querySelectorAll('.overlay').forEach(function(ov){
-  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay') ov.classList.remove('on'); });
+  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay' && ov.id!=='joinAsOverlay' && ov.id!=='notifyOverlay') ov.classList.remove('on'); });
 });
 /* player count selector */
 document.querySelectorAll('#countSeg button').forEach(function(btn){
@@ -2011,6 +2034,193 @@ function mpConnect(){
     });
   });
 }
+/* ================= Join notifications (Firebase Cloud Messaging) =================
+   When someone sits down at your table, their phone POSTs to the game's
+   own /api/notify endpoint, which pushes a pop-up to every other seated
+   player's phone — even with the app closed. Tapping the pop-up opens
+   the game at that table (handled by /firebase-messaging-sw.js, which
+   the messaging SDK registers itself — this page never registers a
+   service worker). Everything here is guarded: no Notification /
+   serviceWorker / PushManager support means no prompt, no error, and
+   multiplayer works exactly as before. The VAPID key is public by
+   design — it only identifies this app to the push services. */
+var PUSH_VAPID_KEY='BKwmI-dy5JBzPoN1fQNN50k89tTGWarYQiecOGRI3sWX8CJhD2z1vc28YmsC9OdOOaqusV5cVY805Iei-zMRDvI';
+var PUSH_ASKED_KEY='spades.pushAsked.v1';
+var PUSH_TOKEN_KEY='spades.pushToken.v1';
+var pushMessaging=null, pushSdkPromise=null;
+function pushSupported(){
+  return ('Notification' in window) && ('serviceWorker' in navigator) && ('PushManager' in window);
+}
+function pushSaved(){
+  try{ return JSON.parse(localStorage.getItem(PUSH_TOKEN_KEY)||'null'); }catch(e){ return null; }
+}
+function pushIsOn(){ var s=pushSaved(); return !!(s && s.token); }
+function pushSyncMenuHint(){ var h=$('notifyHint'); if(h) h.textContent=pushIsOn()?'on':'off'; }
+function mpLoadMessagingSdk(){
+  if(window.firebase && window.firebase.messaging) return Promise.resolve();
+  if(pushSdkPromise) return pushSdkPromise;
+  pushSdkPromise=mpLoadSdk().then(function(){
+    if(window.firebase && window.firebase.messaging) return;
+    return new Promise(function(res, rej){
+      var sc=document.createElement('script');
+      sc.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js';
+      sc.async=false;
+      sc.onload=function(){ res(); };
+      sc.onerror=function(){ rej(new Error('sdk')); };
+      document.head.appendChild(sc);
+    });
+  }).then(function(){
+    if(!(window.firebase && window.firebase.messaging)) throw new Error('sdk');
+  });
+  return pushSdkPromise;
+}
+function pushInitMessaging(){
+  if(pushMessaging) return Promise.resolve(pushMessaging);
+  return mpConnect().then(function(){
+    return mpLoadMessagingSdk();
+  }).then(function(){
+    pushMessaging=firebase.messaging();
+    /* Foreground: the app is open, so the join shows as the game's own
+       toast instead of a system pop-up. */
+    pushMessaging.onMessage(function(payload){
+      var data=(payload && payload.data)||{};
+      var note=(payload && payload.notification)||{};
+      var who=cleanName(data.joinerName||'')||'Someone';
+      toast(note.body || (who+' joined your table ♠'));
+      try{ beep(880,0.09,0.05); }catch(e){}
+    });
+    if(typeof pushMessaging.onTokenRefresh==='function'){
+      pushMessaging.onTokenRefresh(function(){
+        pushMessaging.getToken({ vapidKey:PUSH_VAPID_KEY }).then(function(t){
+          if(t) pushSaveToken(t);
+        }).catch(function(){});
+      });
+    }
+    return pushMessaging;
+  });
+}
+function pushSaveToken(token){
+  if(!token || !MP.db || !MP.uid) return Promise.resolve(false);
+  var saved=pushSaved();
+  if(saved && saved.token===token && saved.uid===MP.uid){ pushSyncMenuHint(); return Promise.resolve(true); }
+  var ref=MP.db.ref('pushTokens/'+MP.uid).push();
+  return ref.set({ token:token, at:Date.now() }).then(function(){
+    /* A refreshed token replaces the old one — drop the stale entry. */
+    if(saved && saved.key && saved.uid===MP.uid && saved.key!==ref.key){
+      MP.db.ref('pushTokens/'+MP.uid+'/'+saved.key).set(null).catch(function(){});
+    }
+    try{ localStorage.setItem(PUSH_TOKEN_KEY, JSON.stringify({ key:ref.key, token:token, uid:MP.uid })); }catch(e){}
+    pushSyncMenuHint();
+    return true;
+  }).catch(function(){ return false; });
+}
+function pushEnable(){
+  if(!pushSupported()) return Promise.resolve(false);
+  return pushInitMessaging().then(function(msg){
+    if(!msg) return false;
+    return Notification.requestPermission().then(function(perm){
+      if(perm!=='granted') return false;
+      return msg.getToken({ vapidKey:PUSH_VAPID_KEY }).then(function(token){
+        if(!token) return false;
+        return pushSaveToken(token);
+      });
+    });
+  }).catch(function(){ return false; });
+}
+function pushDisable(){
+  var saved=pushSaved();
+  var jobs=[];
+  if(saved && saved.key && MP.db && MP.uid){
+    jobs.push(MP.db.ref('pushTokens/'+MP.uid+'/'+saved.key).set(null).catch(function(){}));
+  }
+  try{ localStorage.removeItem(PUSH_TOKEN_KEY); }catch(e){}
+  pushSyncMenuHint();
+  if(pushMessaging && typeof pushMessaging.deleteToken==='function'){
+    jobs.push(pushMessaging.deleteToken().catch(function(){}));
+  }
+  return Promise.all(jobs).then(function(){ pushSyncMenuHint(); });
+}
+/* Ask once — the first time this player creates or joins a table. */
+function pushMaybeAsk(){
+  if(!pushSupported()) return;
+  if(pushIsOn()) return;
+  var asked=false;
+  try{ asked=!!localStorage.getItem(PUSH_ASKED_KEY); }catch(e){}
+  if(Notification.permission==='granted'){ pushEnable(); return; }
+  if(asked || Notification.permission==='denied') return;
+  var ov=$('notifyOverlay'); if(ov) ov.classList.add('on');
+}
+function pushMarkAsked(){ try{ localStorage.setItem(PUSH_ASKED_KEY,'1'); }catch(e){} }
+/* Fire-and-forget: tell the table someone just sat down. Never blocks
+   the join, never shows an error — on copies of the game where
+   /api/notify doesn't exist (the downloaded file, other links) the
+   POST simply fails in silence. */
+function mpNotifyJoined(){
+  try{
+    if(!MP.code || !MP.uid) return;
+    fetch('/api/notify', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ room:MP.code, joinerUid:MP.uid, joinerName:mpMyName() })
+    }).catch(function(){});
+  }catch(e){}
+}
+
+/* ================= Join as teammate or opponent =================
+   Partners are the seats opposite each other (seat and seat+2), so at
+   a 4-player table the seat across from the host makes you their
+   teammate and either seat beside the host makes you an opponent. The
+   choice is only offered when it can actually change where you sit:
+   a 4-player table with more than one seat open. */
+function mpHostSeatOf(meta, players){
+  var count=(meta && meta.count)||4;
+  var hu=meta && meta.hostUid;
+  for(var s=0;s<count;s++){
+    var info=players && players[String(s)];
+    if(info && hu && info.uid===hu) return s;
+  }
+  return 0;
+}
+function mpChoiceApplies(meta, players){
+  if(!meta || meta.count!==4 || !players) return false;
+  var open=0;
+  for(var s=0;s<4;s++) if(!players[String(s)]) open++;
+  return open>=2;
+}
+function mpPickSeat(meta, players, pref){
+  var count=meta.count, open=[];
+  for(var s=0;s<count;s++) if(!players[String(s)]) open.push(s);
+  if(!open.length) return { seat:-1, fellBack:false };
+  if(count!==4 || open.length<2 || !pref) return { seat:open[0], fellBack:false };
+  var host=mpHostSeatOf(meta, players);
+  var opp=(host+2)%4;
+  var adj=[(host+1)%4,(host+3)%4].sort(function(a,b){ return a-b; });
+  var want = (pref==='teammate') ? [opp].concat(adj) : adj.concat([opp]);
+  var prefCount = (pref==='teammate') ? 1 : adj.length; /* seats that match the pick itself */
+  for(var i=0;i<want.length;i++){
+    if(open.indexOf(want[i])>=0) return { seat:want[i], fellBack: i>=prefCount };
+  }
+  return { seat:open[0], fellBack:true };
+}
+var mpJoinAsCb=null;
+function mpAskJoinAs(meta, players, cb){
+  mpJoinAsCb=cb;
+  var hostSeat=mpHostSeatOf(meta, players);
+  var hostInfo=players[String(hostSeat)];
+  var hostName=hostInfo ? (cleanName(hostInfo.name)||'the host') : 'the host';
+  var sub=$('joinAsSub');
+  if(sub) sub.textContent='This is '+hostName+'\'s partners table. Sit across from '+hostName+' as their teammate, or beside them as an opponent. If the seat you pick was just taken, you\'ll get the other open seat.';
+  var team=$('joinAsTeamBtn'); if(team) team.textContent='🤝 Teammate — sit across from '+hostName;
+  var opp=$('joinAsOppBtn'); if(opp) opp.textContent='⚔ Opponent — sit beside '+hostName;
+  mpSetStatus('');
+  $('joinAsOverlay').classList.add('on');
+}
+function mpAnswerJoinAs(pref){
+  $('joinAsOverlay').classList.remove('on');
+  var cb=mpJoinAsCb; mpJoinAsCb=null;
+  if(cb) cb(pref);
+}
+
 function mpRef(path){ return MP.db.ref('rooms/'+MP.code+(path?'/'+path:'')); }
 function mpListen(ref, evt, cb){
   ref.on(evt, cb);
@@ -2080,11 +2290,19 @@ function mpCreate(){
     mpEnterLobby();
     mpWatchLobby();
     mpSetupPresence();
+    setTimeout(pushMaybeAsk, 700);
   }).catch(function(){
     mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
   });
 }
-function mpJoin(code){
+function mpJoinError(err){
+  var m=(err && err.message)||'';
+  if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
+  else if(m==='started') mpSetStatus('That table has already started playing. Ask the host for a new table.');
+  else if(m==='full') mpSetStatus('That table is full.');
+  else mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
+}
+function mpJoin(code, pref){
   code=(code||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
   if(code.length!==4){ mpSetStatus('A room code is 4 letters — check the code and try again.'); return; }
   mpSetStatus('Connecting…');
@@ -2107,17 +2325,52 @@ function mpJoin(code){
              visitor away — ask the host for a seat instead. The host
              sees the request at the table and can let them in (they
              take a free or computer-filled seat and are dealt in on
-             the next hand) or decline it. */
-          mpRequestJoin(code, ref, meta, players);
+             the next hand) or decline it. At a partners table with
+             more than one seat open, the requester first picks
+             teammate or opponent; the pick rides with the request and
+             the host seats them by it. */
+          if(pref===undefined && mpChoiceApplies(meta, players)){
+            mpAskJoinAs(meta, players, function(chosen){
+              mpRequestJoin(code, ref, meta, players, chosen);
+            });
+            return;
+          }
+          mpRequestJoin(code, ref, meta, players, pref);
           return;
         }
         if(!rejoin && meta.status!=='lobby') throw new Error('started');
-        if(mySeat<0){
-          for(var s=0;s<meta.count;s++){ if(!players[String(s)]){ mySeat=s; break; } }
+        /* Partners table, more than one seat open, no pick yet: ask
+           BEFORE claiming a seat, so the pick decides where they sit. */
+        if(!rejoin && pref===undefined && mpChoiceApplies(meta, players)){
+          mpAskJoinAs(meta, players, function(chosen){
+            mpJoinClaim(code, ref, meta, chosen).catch(mpJoinError);
+          });
+          return;
         }
-        if(mySeat<0) throw new Error('full');
-        var entry={}; entry[String(mySeat)]={ uid:MP.uid, name:mpMyName() };
-        return ref.child('players').update(entry).then(function(){
+        return mpJoinClaim(code, ref, meta, pref);
+      });
+    });
+  }).catch(mpJoinError);
+}
+/* Claim a seat at a lobby table (or reclaim this phone's own seat on a
+   reconnect). The players node is re-read at claim time: if the seat
+   the joiner picked — teammate across from the host, or opponent beside
+   them — was taken while they were choosing, they get the other open
+   seat and a toast says so. */
+function mpJoinClaim(code, ref, meta, pref){
+  return ref.child('players').once('value').then(function(psnap){
+    var players=psnap.val()||{};
+    var mySeat=-1;
+    Object.keys(players).forEach(function(k){ if(players[k] && players[k].uid===MP.uid) mySeat=parseInt(k,10); });
+    var rejoin = mySeat>=0;
+    var pick={ seat:-1, fellBack:false };
+    if(!rejoin){
+      pick=mpPickSeat(meta, players, pref||null);
+      mySeat=pick.seat;
+    }
+    if(mySeat<0) throw new Error('full');
+    var entry={}; entry[String(mySeat)]={ uid:MP.uid, name:mpMyName() };
+    return ref.child('players').update(entry).then(function(){
           MP.active=true; MP.code=code; MP.mySeat=mySeat;
           MP.roomRef=ref; MP.meta=meta; MP.hostUid=meta.hostUid||null;
           MP.seats=players; MP.seats[String(mySeat)]=entry[String(mySeat)];
@@ -2132,6 +2385,7 @@ function mpJoin(code){
           mpSaveSession();
           mpWatchLobby();
           mpSetupPresence();
+          if(!rejoin){ mpNotifyJoined(); setTimeout(pushMaybeAsk, 700); }
           if(meta.status==='playing'){
             if(MP.isHost){
               /* The host is back before any handover: rebuild the exact
@@ -2158,15 +2412,8 @@ function mpJoin(code){
           mpEnterLobby();
           if(!MP.isHost) mpWatchGuestGame();
           if(rejoin) toast('Welcome back — same seat as before ♠');
+          else if(pick.fellBack) toast('That seat was just taken — you\'re in the other open seat ♠');
         });
-      });
-    });
-  }).catch(function(err){
-    var m=(err && err.message)||'';
-    if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
-    else if(m==='started') mpSetStatus('That table has already started playing. Ask the host for a new table.');
-    else if(m==='full') mpSetStatus('That table is full.');
-    else mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
   });
 }
 
@@ -2181,11 +2428,16 @@ function mpJoin(code){
    read. Until the host lets them in, the seat keeps being played by the
    computer; an accepted player is dealt in from the next hand. */
 function mpSetCancelReqVisible(v){ var b=$('mpCancelReqBtn'); if(b) b.style.display=v?'block':'none'; }
-function mpRequestJoin(code, ref, meta, players){
-  var seat=-1;
-  for(var s=0;s<meta.count;s++){ if(!players[String(s)]){ seat=s; break; } }
+function mpRequestJoin(code, ref, meta, players, pref){
+  /* The claim seat is picked by the teammate/opponent preference when
+     one was chosen; the preference itself rides in the claim entry, so
+     the host sees it with the request and can re-seat by it on accept
+     if the seats have shifted since the request was sent. */
+  var pick=mpPickSeat(meta, players, pref||null);
+  var seat=pick.seat;
   if(seat<0){ mpSetStatus('That table is full — every seat has a player. Ask the host to start a new table when this game ends.'); return; }
-  var entry={}; entry[String(seat)]={ uid:MP.uid, name:mpMyName() };
+  if(pick.fellBack) toast('Your first-choice seat was just taken — you\'re asking for the other open seat.');
+  var entry={}; entry[String(seat)]={ uid:MP.uid, name:mpMyName(), pref:pref||null };
   ref.child('players').update(entry).then(function(){
     MP.code=code; MP.roomRef=ref; MP.meta=meta; MP.hostUid=meta.hostUid||null;
     MP.mySeat=seat; MP.isHost=false; MP.joinPending=true; MP._joinResolved=false;
@@ -2205,6 +2457,12 @@ function mpWatchJoinRequest(){
     MP.seats=snap.val()||{};
     var mine=MP.seats[String(MP.mySeat)];
     if(!mine || mine.uid!==MP.uid){
+      /* The host seating me by my teammate/opponent pick moves my
+         claim to a different seat — follow it rather than reading it
+         as losing the seat. */
+      var moved=-1;
+      Object.keys(MP.seats).forEach(function(k){ if(MP.seats[k] && MP.seats[k].uid===MP.uid) moved=parseInt(k,10); });
+      if(moved>=0){ MP.mySeat=moved; return; }
       /* My claim was overwritten — somebody else took the seat first. */
       MP._joinResolved=true; MP.joinPending=false;
       mpSetCancelReqVisible(false);
@@ -2217,7 +2475,14 @@ function mpWatchJoinRequest(){
     if(pub.declinedUid && pub.declinedUid===MP.uid){ mpJoinDeclined(); return; }
     var acc=(pub.joinAccepted && pub.joinAccepted[MP.uid]!==undefined) ? parseInt(pub.joinAccepted[MP.uid],10) : -1;
     var adoptedSeat=(pub.players && pub.players[MP.mySeat] && pub.players[MP.mySeat].uid===MP.uid);
-    if(acc===MP.mySeat || adoptedSeat) mpJoinAccepted();
+    if(acc>=0){
+      /* The host may have seated me by my teammate/opponent pick at a
+         different seat than the one I claimed — follow the seat they
+         published for my uid. */
+      if(acc!==MP.mySeat) MP.mySeat=acc;
+      mpJoinAccepted();
+    }
+    else if(adoptedSeat) mpJoinAccepted();
   });
 }
 function mpJoinAccepted(){
@@ -2228,6 +2493,8 @@ function mpJoinAccepted(){
   mpSaveSession();
   mpWatchGuestGame();
   mpSetupPresence();
+  mpNotifyJoined();
+  setTimeout(pushMaybeAsk, 700);
   closeAll();
   toast('You\'re in! Watch this hand out — you\'re dealt in on the next one ♠');
 }
@@ -2282,7 +2549,7 @@ function mpHostCheckJoinRequests(){
     if(MP.declinedUids[info.uid]) continue; /* already said no to this phone */
     var cur=MP.joinRequests[String(s)];
     if(cur && cur.uid===info.uid) continue; /* already on screen */
-    MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'pending' };
+    MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'pending', pref:(info.pref==='teammate'||info.pref==='opponent') ? info.pref : null };
     toast((cleanName(info.name)||'A player')+' wants to join your table ♠');
     try{ beep(880,0.09,0.05); }catch(e){}
   }
@@ -2300,7 +2567,9 @@ function mpRenderJoinRequests(){
     var txt=document.createElement('div');
     var nm=document.createElement('b'); nm.textContent=r.name;
     txt.appendChild(nm);
-    txt.appendChild(document.createTextNode(' wants to join this game. Seat '+(seat+1)+' is open (the computer is playing it) — let them in and they\'re dealt in from the next hand.'));
+    txt.appendChild(document.createTextNode(' wants to join this game. Seat '+(seat+1)+' is open (the computer is playing it) — let them in and they\'re dealt in from the next hand.'
+      +(r.pref==='teammate' ? ' They\'d like to sit across from you as your teammate.' : '')
+      +(r.pref==='opponent' ? ' They\'d like to sit beside you as an opponent.' : '')));
     div.appendChild(txt);
     var btns=document.createElement('div');
     btns.className='mp-joinreq-btns';
@@ -2315,9 +2584,46 @@ function mpRenderJoinRequests(){
     bar.appendChild(div);
   });
 }
+/* Where the host seats an accepted requester who picked teammate or
+   opponent: their claimed seat if it already matches the pick (or no
+   pick was made), else the seat the pick names — across from the host
+   for a teammate, the lowest open seat beside the host for an opponent
+   — when that seat is still free and computer-played. Anything else
+   falls back to the claimed seat. */
+function mpReseatTarget(r, claimed){
+  if(!r || !r.pref || !MP.seats || !G || mpTableCount()!==4) return claimed;
+  var hostSeat=mpHostSeat();
+  var want = (r.pref==='teammate')
+    ? [(hostSeat+2)%4]
+    : [(hostSeat+1)%4,(hostSeat+3)%4].sort(function(a,b){ return a-b; });
+  if(want.indexOf(claimed)>=0) return claimed;
+  for(var i=0;i<want.length;i++){
+    var s=want[i];
+    if(MP.seats[String(s)]) continue; /* a real player holds it */
+    var gp=G.players[mpAbsToView(s)];
+    if(gp && !gp.uid) return s; /* free and computer-played — seat them there */
+  }
+  return claimed;
+}
 function mpAcceptJoin(absSeat){
   var r=MP.joinRequests[String(absSeat)];
   if(!r) return;
+  var target=mpReseatTarget(r, absSeat);
+  if(target!==absSeat){
+    /* Move the claim to the seat their pick names, then approve there:
+       the public state's joinAccepted follows the new seat, and their
+       phone follows the move (see mpWatchJoinRequest). */
+    var entry={}; entry[String(target)]={ uid:r.uid, name:r.name, pref:r.pref||null };
+    mpRef('players').update(entry).catch(function(){});
+    mpRef('players/'+absSeat).set(null).catch(function(){});
+    if(MP.seats){ MP.seats[String(target)]=entry[String(target)]; delete MP.seats[String(absSeat)]; }
+    delete MP.joinRequests[String(absSeat)];
+    MP.joinRequests[String(target)]={ uid:r.uid, name:r.name, status:'approved', pref:r.pref||null };
+    mpHostSync(); /* publish the acceptance in the public state at once */
+    mpRenderJoinRequests();
+    toast(r.name+' is in — seated as your '+(r.pref==='teammate'?'teammate':'opponent')+', dealt in on the next hand ♠');
+    return;
+  }
   r.status='approved';
   mpHostSync(); /* publish the acceptance in the public state at once */
   mpRenderJoinRequests();
@@ -2839,6 +3145,33 @@ document.querySelectorAll('#mpScoreSeg button').forEach(function(btn){
   });
 });
 $('mpCreateBtn').addEventListener('click', mpCreate);
+$('joinAsTeamBtn').addEventListener('click', function(){ mpAnswerJoinAs('teammate'); });
+$('joinAsOppBtn').addEventListener('click', function(){ mpAnswerJoinAs('opponent'); });
+$('joinAsAnyBtn').addEventListener('click', function(){ mpAnswerJoinAs(null); });
+$('notifyAllowBtn').addEventListener('click', function(){
+  pushMarkAsked();
+  $('notifyOverlay').classList.remove('on');
+  pushEnable().then(function(ok){
+    toast(ok ? 'Table notifications on — you\'ll get a pop-up when someone joins ♠' : 'Notifications didn\'t turn on — check your browser\'s notification permission for this site.');
+  });
+});
+$('notifyLaterBtn').addEventListener('click', function(){
+  pushMarkAsked();
+  $('notifyOverlay').classList.remove('on');
+});
+$('notifyBtn').addEventListener('click', function(){
+  closeAll();
+  if(!pushSupported()){ toast('This browser can\'t show table notifications.'); return; }
+  pushMarkAsked();
+  if(pushIsOn()){
+    pushDisable().then(function(){ toast('Table notifications off — no more join pop-ups on this phone.'); });
+  } else {
+    pushEnable().then(function(ok){
+      toast(ok ? 'Table notifications on — you\'ll get a pop-up when someone joins your table ♠' : 'Notifications didn\'t turn on — check your browser\'s notification permission for this site.');
+    });
+  }
+});
+pushSyncMenuHint();
 $('mpJoinBtn').addEventListener('click', function(){ mpJoin($('mpJoinInput').value); });
 $('mpJoinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpJoin($('mpJoinInput').value); });
 $('lobbyStartBtn').addEventListener('click', mpHostStart);
