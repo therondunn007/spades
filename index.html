@@ -1754,13 +1754,20 @@ function mpRenderTableNotes(){
   mpFillTableNotes($('mpTableNotes'));
 }
 /* Announce a join on every phone at the table, and retire the
-   sender-only text/share waiting line — somebody has arrived. */
+   sender-only text/share waiting line — somebody has arrived. The
+   announcement is said out loud two ways at once: a toast that pops
+   up wherever the player is looking ("X joined the table ♠"), and
+   the gold line on the table itself, which stays up long enough to
+   still be there when they glance back at the table. */
 function mpAnnounceJoined(name){
   MP._localInviteSent=false;
-  MP._joinedNote={ name:(cleanName(name||'')||'A player'), until:Date.now()+6000 };
+  var who=cleanName(name||'')||'A player';
+  MP._joinedNote={ name:who, until:Date.now()+12000 };
   if(MP._joinedTimer) clearTimeout(MP._joinedTimer);
-  MP._joinedTimer=setTimeout(function(){ MP._joinedNote=null; mpRenderTableNotes(); }, 6200);
+  MP._joinedTimer=setTimeout(function(){ MP._joinedNote=null; mpRenderTableNotes(); }, 12200);
   mpRenderTableNotes();
+  toast(who+' joined the table ♠');
+  sndWin();
 }
 /* Host side of clearing: when the host's phone sees a player sit down,
    delete any pending invites addressed to that player — their wait is
