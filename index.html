@@ -2404,22 +2404,47 @@ function mpSetupPresence(){
 function mpWatchPresence(){
   if(MP._presenceReady || !MP.roomRef) return;
   MP._presenceReady=true;
-  mpListen(mpRef('presence'), 'value', function(snap){
-    MP.presence=snap.val()||{};
-    var now=Date.now();
-    Object.keys(MP.presence).forEach(function(k){
-      var pr=MP.presence[k];
-      if(pr && pr.connected===false){
-        if(!MP.awaySince[k]) MP.awaySince[k]=(typeof pr.lastSeen==='number' ? pr.lastSeen : now);
-      } else if(pr && pr.connected===true){
-        delete MP.awaySince[k];
-      }
-    });
-    mpRenderPresenceUI();
-    mpCheckHostHandover();
-    /* The table re-renders often; make sure away badges survive it. */
-    if(G && $('gameScreen').classList.contains('on')) renderAll();
-  });
+  /* One listener per seat, merged into MP.presence here — NOT one
+     listener on the whole presence node. The database rules grant
+     nodes one at a time, and a listener on a parent they don't grant
+     is denied silently: no snapshot, no error, and every seat looks
+     present forever — which is how a host who stepped out of the
+     lobby never showed as Away on anyone else's screen. A per-seat
+     listener works whether the grant sits on the seat or above it,
+     and each one carries an error callback so a denial names itself
+     in the console instead of going quiet. Tables seat at most four;
+     a seat nobody sits in simply reads back null. */
+  for(var s=0;s<4;s++){
+    (function(seat){
+      mpListen(mpRef('presence/'+seat), 'value', function(snap){
+        mpPresenceSeat(seat, snap.val());
+      }, function(err){
+        if(window.console) console.warn('Spades: presence for seat '+(seat+1)+' could not be read ('+((err && err.code)||'permission denied')+') — Away labels may not show for that seat.');
+      });
+    })(s);
+  }
+}
+/* One seat's presence arrived (or changed, or was removed). Merge it
+   into the mirror every phone renders from, keep the away clock for
+   that seat honest, and repaint — the lobby tags, the in-game banner
+   and the table all read the same mirror. A seat that reports back
+   connected — the player returned, reopened the app, or stepped back
+   in — loses its away stamp here, so the Away label comes off every
+   screen the moment they return; a seat whose presence is removed
+   entirely (they left for good, or the host replaced them with the
+   computer) clears the same way, since an empty seat is never "away". */
+function mpPresenceSeat(seat, pr){
+  var k=String(seat);
+  if(pr) MP.presence[k]=pr; else delete MP.presence[k];
+  if(pr && pr.connected===false){
+    if(!MP.awaySince[k]) MP.awaySince[k]=(typeof pr.lastSeen==='number' ? pr.lastSeen : Date.now());
+  } else {
+    delete MP.awaySince[k];
+  }
+  mpRenderPresenceUI();
+  mpCheckHostHandover();
+  /* The table re-renders often; make sure away badges survive it. */
+  if(G && $('gameScreen').classList.contains('on')) renderAll();
 }
 /* Away seats across the table: banner in the game, tags in the lobby,
    and — for the host — a Replace-with-AI button once a seat has been
@@ -2896,8 +2921,12 @@ function mpAnswerJoinAs(pref){
 }
 
 function mpRef(path){ return MP.db.ref('rooms/'+MP.code+(path?'/'+path:'')); }
-function mpListen(ref, evt, cb){
-  ref.on(evt, cb);
+function mpListen(ref, evt, cb, errCb){
+  /* errCb matters: a listener the database rules deny never fires its
+     callback and, without an error callback, fails in complete silence —
+     the page just looks like nothing ever arrives. Callers that depend
+     on the data pass one so a denial names itself in the console. */
+  ref.on(evt, cb, errCb);
   MP.listeners.push({ref:ref, evt:evt, cb:cb});
 }
 function mpDetach(){
@@ -3957,7 +3986,13 @@ function mpStepOut(){
          later closes for real. */
       try{ pref.onDisconnect().cancel(); }catch(e){}
       var stamp=(window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now();
-      pref.set({ uid:MP.uid, name:mpMyName(), connected:false, lastSeen:stamp }).catch(function(){});
+      /* This write IS the Away label: if the database ever denies it,
+         say so in the console with the reason instead of swallowing
+         it — a silent failure here leaves the table thinking the host
+         is still sitting there. */
+      pref.set({ uid:MP.uid, name:mpMyName(), connected:false, lastSeen:stamp }).catch(function(err){
+        if(window.console) console.warn('Spades: could not mark seat '+(MP.mySeat+1)+' as away ('+((err && err.code)||'permission denied')+') — the table will not show the Away label.');
+      });
     }
   }catch(e){}
   /* Keep the session — that is the whole point of stepping out. */
