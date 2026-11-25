@@ -255,6 +255,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .mp-table-notes:empty{display:none}
 .mp-note-line{font-family:Verdana,sans-serif;font-size:13px;line-height:1.5;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mp-note-line.joined{color:var(--gold-soft);font-weight:bold;font-size:13.5px}
+.mp-note-line.count{color:var(--gold-soft);font-weight:bold;font-size:13.5px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.45);border-radius:9px;padding:7px 10px}
 .mp-note-line .mp-cancel{margin-left:auto;flex:none;background:transparent;border:1px solid rgba(255,255,255,.3);color:var(--text);border-radius:8px;padding:4px 10px;font-size:12.5px;font-family:Verdana,sans-serif}
 .mp-note-line .mp-cancel:active{transform:scale(.96)}
 /* ---------- Friends by handle ---------- */
@@ -1857,6 +1858,13 @@ function mpInvite(){
 /* ================= Table notes: pending invites & joins =================
    One set of lines, rendered in two spots — under the player list in
    the lobby and in the in-game multiplayer bar:
+     • "You've invited N people to this table" — a count line at the
+       top, always first when anyone has been invited: how many people
+       YOU have invited to this table and are still waiting on (your
+       pending friend invites plus your text/share invites). If other
+       players at the table also have invites out, the line adds the
+       table total too. This is the at-a-glance number; the lines
+       below it say who you're waiting for.
      • "Waiting for X to join…" for every friend invite sent from this
        table that hasn't landed yet (rooms/{code}/pendingInvites,
        written by the sender's phone — everyone seated sees them).
@@ -1878,6 +1886,36 @@ function mpFillTableNotes(el){
   if(!el) return;
   el.innerHTML='';
   if(!MP.code) return;
+  /* Invited count — how many people you have invited to this table.
+     Counts every invite you still have out: friend invites by game
+     name that are still pending (rooms/{code}/pendingInvites with
+     fromUid === you) plus text/share invites sent from this phone
+     (MP._textInviteCount). Shown first so the number is visible at a
+     glance in both the lobby and the in-game bar; the per-person
+     "Waiting for…" lines below it give the detail. */
+  (function(){
+    var pendAll=MP.pendingInvites||{};
+    var totalPend=0, myPend=0;
+    Object.keys(pendAll).forEach(function(id){
+      var e=pendAll[id]; if(!e) return;
+      totalPend++;
+      if(e.fromUid && e.fromUid===MP.uid) myPend++;
+    });
+    var textN=MP._localInviteSent ? (MP._textInviteCount||1) : 0;
+    var myTotal=myPend+textN;
+    var tableTotal=totalPend+textN;
+    if(myTotal<=0 && totalPend<=0) return;
+    var c=document.createElement('div');
+    c.className='mp-note-line count';
+    c.setAttribute('role','status');
+    if(myTotal>0){
+      c.textContent="You've invited "+myTotal+(myTotal===1?' person':' people')+' to this table';
+      if(totalPend>myPend) c.textContent+=' · '+tableTotal+' invited in total';
+    } else {
+      c.textContent=totalPend+(totalPend===1?' person has':' people have')+' been invited to this table';
+    }
+    el.appendChild(c);
+  })();
   if(MP._joinedNote && Date.now()<MP._joinedNote.until){
     var j=document.createElement('div');
     j.className='mp-note-line joined';
