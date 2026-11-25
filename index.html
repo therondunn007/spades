@@ -2783,8 +2783,12 @@ function pushInitMessaging(){
     pushMessaging.onMessage(function(payload){
       var data=(payload && payload.data)||{};
       var note=(payload && payload.notification)||{};
-      var who=cleanName(data.joinerName||'')||'Someone';
-      toast(note.body || (who+' joined your table ♠'));
+      if(data.type==='start'){
+        toast((cleanName(data.hostName||'')||'The host')+' started the game ♠');
+      }else{
+        var who=cleanName(data.joinerName||'')||'Someone';
+        toast(note.body || (who+' joined your table ♠'));
+      }
       try{ beep(880,0.09,0.05); }catch(e){}
     });
     if(typeof pushMessaging.onTokenRefresh==='function'){
@@ -2860,6 +2864,20 @@ function mpNotifyJoined(){
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body:JSON.stringify({ room:MP.code, joinerUid:MP.uid, joinerName:mpMyName() })
+    }).catch(function(){});
+  }catch(e){}
+}
+/* Fire-and-forget: the host started the game, so tell the rest of the
+   table. Never blocks the start, never shows an error — on copies of
+   the game where /api/game-start doesn't exist the POST simply fails
+   in silence. */
+function mpNotifyGameStarted(){
+  try{
+    if(!MP.code || !MP.uid) return;
+    fetch('/api/game-start', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ room:MP.code, hostUid:MP.uid, hostName:mpMyName() })
     }).catch(function(){});
   }catch(e){}
 }
@@ -3564,6 +3582,7 @@ function mpHostStart(){
   if(MP.meta) MP.meta.status='playing';
   $('lobbyOverlay').classList.remove('on');
   startGame(MP.meta.count);
+  mpNotifyGameStarted();
   mpWatchHostIntents();
   mpSaveSession();
   mpRenderPresenceUI();
