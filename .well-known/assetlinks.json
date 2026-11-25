@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.therondunn007.spades",
+      "sha256_cert_fingerprints": [
+        "99FDA3E9B563F85765200EA0E45B929B0A2A7049DEE3142C6C605F85CCC036E9"
+      ]
+    }
+  }
+]
