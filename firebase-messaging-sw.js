@@ -1,7 +1,8 @@
 // Firebase Cloud Messaging service worker for Spades.
 // Registered automatically by Firebase Messaging as /firebase-messaging-sw.js.
-// Shows the "someone joined your table" notification when the app is closed;
-// tapping it opens the game straight at that table.
+// Shows the "someone joined your table" and "the host started the game"
+// notifications when the app is closed; tapping one opens the game
+// straight at that table.
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
@@ -20,7 +21,7 @@ messaging.onBackgroundMessage(function (payload) {
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     data: { url: url },
-    tag: 'spades-table-join'
+    tag: data.tag || 'spades-table-join'
   });
 });
 
