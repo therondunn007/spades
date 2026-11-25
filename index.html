@@ -520,6 +520,14 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <button class="big-btn" id="mpJoinBtn">Join table</button>
     <p class="mp-status" id="mpStatus" role="status"></p>
     <button class="big-btn" id="mpCancelReqBtn" style="display:none">Cancel join request</button>
+    <button class="big-btn" id="mpQueueBtn" style="display:none">Join the queue for this table</button>
+    <div id="mpQueueBox" hidden>
+      <p class="mp-status" id="mpQueueLine" role="status" style="font-size:14.5px;color:var(--text)"></p>
+      <p class="mp-status" id="mpQueueCount"></p>
+      <button class="big-btn" id="mpQueueClaimBtn" style="display:none">🎉 A seat opened — tap to join</button>
+      <p class="small muted" style="text-align:center">You'll be told the moment a seat opens — right here in the game, and by a pop-up even if the app is closed (allow notifications when you're asked).</p>
+      <button class="ghost-btn" id="mpQueueLeaveBtn">Leave the queue</button>
+    </div>
     <button class="ghost-btn" id="mpInstallBtn">⬇ Install the game — add to home screen</button>
     <p class="small muted" style="text-align:center;margin:2px 0 0">New here? Spades plays right in your browser — installing just adds its ♠ icon to your home screen so it opens like an app.</p>
     <button class="ghost-btn" id="mpCloseBtn">Back</button>
@@ -1561,6 +1569,9 @@ if(!new URLSearchParams(location.search).get('room')) loadSavedGame();
      rooms/{CODE}/pendingInvites/{inviteId}  friend invites sent from this
         table that are still waiting — shown on the table until the
         invited player sits down (or the sender cancels, or they decline)
+     rooms/{CODE}/queue/{uid}  players waiting for a seat at a full table,
+        first come first served (ordered by ts); rooms/{CODE}/queueHold
+        is the seat currently held for the first person in that line
    The host's phone runs the same game engine as solo play and publishes
    the table after every change; guests render a mirror of the room and
    send their bids / cards / Ready taps back as intents. Empty seats are
@@ -1601,7 +1612,15 @@ var MP={
      display, the sender-only note for text/share invites, and the
      short-lived "X joined the table" announcement. */
   pendingInvites:{}, _pendingWatching:false,
-  _localInviteSent:false, _joinedNote:null, _joinedTimer:null, _pubUids:null
+  _localInviteSent:false, _textInviteCount:0,
+  _joinedNote:null, _joinedTimer:null, _pubUids:null,
+  /* Join queue for a full table: the queue mirror everyone at the table
+     reads (for the "N waiting in line" note), the seat hold for the
+     first person in line, and this phone's own waiting state when it
+     is the one standing in line (queueing / _queueCode). */
+  queue:{}, queueHold:null, _queueWatching:false,
+  queueing:false, _queueCode:null, _queueClaiming:false, _queueSeenMine:false,
+  _queueOfferCode:null, _queueHoldWritten:null, _queueUiTimer:null, _queueHoldMine:false
 };
 function mpMyName(){ return playerNameFor(selectedCount,0); }
 /* Seat maths: the game engine always sees the local player at index 0,
@@ -1634,16 +1653,18 @@ function mpLoadSession(){
    The "Invite sent — waiting for someone to join…" line is sender-only:
    a text/share invite doesn't say who it went to, so there's nothing in
    the room to restore it from. Remember on this phone only, keyed by the
-   room code, that a text/share invite went out for this table. Rejoining
-   the same table (session resume or the ?room= link, lobby or mid-game)
-   restores the line; it clears when someone joins (mpAnnounceJoined) and
-   when this phone leaves the table (mpLeaveTable). Friend invites in
-   rooms/{code}/pendingInvites already live in the database and are
-   untouched by this. */
+   room code, how many text/share invites went out for this table (the
+   stored value is the count; a flag saved by an older version reads as
+   1). Rejoining the same table (session resume or the ?room= link,
+   lobby or mid-game) restores the line with its count; it clears when
+   someone joins (mpAnnounceJoined) and when this phone leaves the
+   table (mpLeaveTable). Friend invites in rooms/{code}/pendingInvites
+   already live in the database, keep their own per-person lines, and
+   are not counted in this number. */
 var MP_TEXT_INVITE_PREFIX='spades.mpTextInvite.v1.';
 function mpSaveTextInviteFlag(){
   if(!MP.code) return;
-  try{ localStorage.setItem(MP_TEXT_INVITE_PREFIX+MP.code, '1'); }catch(e){}
+  try{ localStorage.setItem(MP_TEXT_INVITE_PREFIX+MP.code, String(Math.max(1, MP._textInviteCount||1))); }catch(e){}
 }
 function mpClearTextInviteFlag(code){
   var c=code||MP.code; if(!c) return;
@@ -1651,10 +1672,18 @@ function mpClearTextInviteFlag(code){
 }
 function mpRestoreTextInviteFlag(){
   if(!MP.code) return;
-  try{ if(localStorage.getItem(MP_TEXT_INVITE_PREFIX+MP.code)) MP._localInviteSent=true; }catch(e){}
+  try{
+    var v=localStorage.getItem(MP_TEXT_INVITE_PREFIX+MP.code);
+    if(v){
+      MP._localInviteSent=true;
+      var n=parseInt(v,10);
+      MP._textInviteCount=(isNaN(n)||n<1) ? 1 : n; /* an old plain flag counts as one invite */
+    }
+  }catch(e){}
 }
 function mpMarkTextInviteSent(){
   MP._localInviteSent=true;
+  MP._textInviteCount=(MP._textInviteCount||0)+1;
   mpSaveTextInviteFlag();
   mpRenderTableNotes();
 }
@@ -1739,10 +1768,14 @@ function mpInvite(){
        The sender — and only the sender — gets a Cancel button on
        their own invites.
      • "Invite sent — waiting for someone to join…" after a text or
-       share invite: local to the sender's phone only, because a text
-       invite doesn't say who it went to. The phone remembers it (keyed
-       by room code) so the line survives a refresh; it clears when the
-       next player sits down or the sender leaves the table.
+       share invite (with a count — "Invites sent to 3 people…" — once
+       more than one has gone out): local to the sender's phone only,
+       because a text invite doesn't say who it went to. The phone
+       remembers it (keyed by room code) so the line survives a
+       refresh; it clears when the next player sits down or the sender
+       leaves the table.
+     • "N waiting in line" while people are queued for a seat at this
+       table (see the join queue below); the host also sees who is next.
      • "X joined the table ♠" for a few seconds when a player sits
        down, on every phone at the table. */
 function mpFillTableNotes(el){
@@ -1774,8 +1807,22 @@ function mpFillTableNotes(el){
   if(MP._localInviteSent){
     var l=document.createElement('div');
     l.className='mp-note-line';
-    l.textContent='Invite sent — waiting for someone to join…';
+    var n=MP._textInviteCount||1;
+    l.textContent = n>=2
+      ? 'Invites sent to '+n+' people — waiting for someone to join…'
+      : 'Invite sent — waiting for someone to join…';
     el.appendChild(l);
+  }
+  /* The join queue, for everyone seated: how many people are waiting
+     for a seat at this table — and, for the host, who is next. */
+  var qEntries=mpQueueEntries();
+  if(MP.active && qEntries.length){
+    var ql=document.createElement('div');
+    ql.className='mp-note-line';
+    var qt=qEntries.length+' waiting in line';
+    if(MP.isHost) qt+=' — next: '+(cleanName(qEntries[0].name||'')||'Player');
+    ql.textContent=qt;
+    el.appendChild(ql);
   }
 }
 function mpRenderTableNotes(){
@@ -1790,6 +1837,7 @@ function mpRenderTableNotes(){
    still be there when they glance back at the table. */
 function mpAnnounceJoined(name){
   MP._localInviteSent=false;
+  MP._textInviteCount=0;
   mpClearTextInviteFlag();
   var who=cleanName(name||'')||'A player';
   MP._joinedNote={ name:who, until:Date.now()+12000 };
@@ -1843,6 +1891,316 @@ function mpCancelPendingInvite(inviteId){
   toast('Invite to '+(cleanName(e.toName||'')||'your friend')+' cancelled.');
 }
 
+/* ================= Join queue — first come, first served =================
+   When a table is full, a visitor can join its queue instead of being
+   turned away: rooms/{code}/queue/{uid} = {name, ts} — one entry per
+   person, and first in line is the lowest ts. The phone driving the
+   table (the host, or whoever took over hosting) watches for a seat
+   to open — a lobby player leaving, or an away player the host
+   replaces mid-game — and holds that seat for the first person in
+   line by writing rooms/{code}/queueHold = {uid, seat, until:
+   now + 2 minutes}, so nobody else can take it meanwhile. The held
+   player is told two ways: their waiting screen flips to "A seat
+   opened — tap to join" with a countdown, and the host fires a
+   fire-and-forget POST to /api/queue-notify so a push pop-up reaches
+   them even with the app closed. Tapping Join claims the seat: in the
+   lobby they sit straight down; mid-game they make the same seat
+   claim a join request makes, flagged viaQueue, which the host seats
+   at once (no Let-in prompt — the seat was already offered), and
+   they're dealt in from the next hand like any accepted join. If the
+   hold runs out unclaimed, the host removes that player from the
+   queue and offers the seat to the next person in line. With nobody
+   in the queue, none of this runs and seats fill exactly as before. */
+var MP_QUEUE_HOLD_MS=120000;
+function mpQueueEntries(){
+  var q=MP.queue||{};
+  return Object.keys(q).map(function(uid){
+    var e=q[uid]||{};
+    return { uid:uid, name:e.name||'', ts:(typeof e.ts==='number'?e.ts:0) };
+  }).sort(function(a,b){ return (a.ts-b.ts) || (a.uid<b.uid?-1:(a.uid>b.uid?1:0)); });
+}
+/* A copy of the players map with an actively held seat filled in, so
+   seat picking never hands a held seat to a walk-in. A hold for this
+   phone itself doesn't block it. */
+function mpBlockHeldSeat(players, hold){
+  if(!hold || hold.uid===MP.uid || !(hold.until>Date.now())) return players;
+  if(!players || players[String(hold.seat)]) return players;
+  var copy={}; Object.keys(players).forEach(function(k){ copy[k]=players[k]; });
+  copy[String(hold.seat)]={ uid:'__queuehold__', name:'Held for the queue' };
+  return copy;
+}
+/* Everyone at a table — and everyone waiting in its queue — mirrors
+   the queue and the hold. Seated players get the "N waiting in line"
+   note; the waiting phone gets its position and its hold; the driving
+   phone gets the triggers that offer seats and expire holds. */
+function mpWatchQueue(){
+  if(MP._queueWatching || !MP.roomRef) return;
+  MP._queueWatching=true;
+  mpListen(mpRef('queue'), 'value', function(snap){
+    MP.queue=snap.val()||{};
+    Object.keys(MP.queue).forEach(function(k){
+      var e=MP.queue[k]; if(e) e.name=cleanName(e.name||'');
+    });
+    if(MP.queueing){
+      if(MP.queue[MP.uid]) MP._queueSeenMine=true;
+      else if(MP._queueSeenMine && !MP._queueClaiming){ mpQueuePassedOver(); return; }
+      mpRenderQueueWait();
+    }
+    mpRenderTableNotes();
+    mpQueueMaybeOffer();
+  });
+  mpListen(mpRef('queueHold'), 'value', function(snap){
+    MP.queueHold=snap.val()||null;
+    var mine=!!(MP.queueHold && MP.queueHold.uid===MP.uid && MP.queueHold.until>Date.now());
+    if(MP.queueing){
+      if(mine && !MP._queueHoldMine){
+        toast('🎉 A seat opened at table '+MP._queueCode+' — tap Join to take it!');
+        try{ beep(880,0.09,0.05); setTimeout(function(){ beep(1180,0.1,0.05); },110); }catch(e){}
+      }
+      mpRenderQueueWait();
+    }
+    MP._queueHoldMine=mine;
+    mpQueueTick();
+  });
+}
+/* Driving side: if a seat is open and someone is waiting, hold the
+   seat for the first person in line and tell them — in-app through
+   the queueHold node, and by push through a fire-and-forget POST to
+   /api/queue-notify (errors swallowed, never blocks, at most once per
+   opening). One hold at a time: if several seats open, the rest are
+   offered one after another as each hold is claimed or expires. */
+function mpQueueMaybeOffer(){
+  if(!MP.isHost || !MP.active || !MP.roomRef || !MP.meta) return;
+  if(MP.queueHold){
+    if(MP.queueHold.until>Date.now()) return; /* a hold is already out */
+    mpQueueTick();
+    if(MP.queueHold) return;
+  }
+  var entries=mpQueueEntries();
+  if(!entries.length) return;
+  var first=entries[0];
+  var count=mpTableCount(), seat=-1;
+  for(var s=0;s<count;s++){
+    if(MP.seats && MP.seats[String(s)]) continue; /* a player (or a join claim) holds it */
+    if(MP.meta.status==='playing'){
+      if(!G) continue;
+      var gp=G.players[mpAbsToView(s)];
+      if(!gp || gp.uid) continue; /* still played by its owner */
+    }
+    seat=s; break;
+  }
+  if(seat<0) return;
+  var hold={ uid:first.uid, seat:seat, until:Date.now()+MP_QUEUE_HOLD_MS };
+  MP._queueHoldWritten=hold;
+  mpRef('queueHold').set(hold).then(function(){
+    try{
+      fetch('/api/queue-notify', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ room:MP.code, uid:first.uid })
+      }).catch(function(){});
+    }catch(e){}
+  }).catch(function(){});
+}
+/* Driving side: an unclaimed hold expires — that player leaves the
+   queue, the hold clears, and the seat goes to the next person in
+   line (the queue snapshot that follows re-runs mpQueueMaybeOffer). */
+function mpQueueTick(){
+  if(!MP.isHost || !MP.queueHold) return;
+  if(MP.queueHold.until>Date.now()) return;
+  var uid=MP.queueHold.uid;
+  MP.queueHold=null;
+  if(MP.roomRef){
+    mpRef('queueHold').set(null).catch(function(){});
+    if(uid) mpRef('queue/'+uid).set(null).catch(function(){});
+  }
+}
+/* ---- Waiting side: offer, join, wait, claim, leave ---- */
+function mpOfferQueue(code, msg){
+  if(!code) return;
+  MP._queueOfferCode=code;
+  mpSetStatus(msg || 'That table is full — but you can join the queue. First come, first served: when a seat opens, the first person in line is told and gets a couple of minutes to take it — with a pop-up too, even if the app is closed.');
+  var b=$('mpQueueBtn'); if(b) b.style.display='block';
+}
+function mpHideQueueOffer(){
+  MP._queueOfferCode=null;
+  var b=$('mpQueueBtn'); if(b) b.style.display='none';
+}
+function mpJoinQueue(code){
+  code=(code||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
+  if(code.length!==4) return;
+  if(MP.queueing && MP._queueCode===code){ mpRenderQueueWait(); return; } /* already in line — nothing new */
+  if(MP.queueing) mpLeaveQueue(true);
+  mpHideQueueOffer();
+  mpSetStatus('Joining the queue…');
+  mpConnect().then(function(){
+    var ref=MP.db.ref('rooms/'+code);
+    return ref.child('meta').once('value').then(function(msnap){
+      var meta=msnap.val();
+      if(!meta || meta.status==='closed') throw new Error('noroom');
+      return ref.child('queue/'+MP.uid).once('value');
+    }).then(function(qsnap){
+      if(qsnap && qsnap.val()) return null; /* queued from before — keep the original place in line */
+      return ref.child('queue/'+MP.uid).set({ name:mpMyName(), ts:Date.now() });
+    }).then(function(){
+      MP.queueing=true; MP._queueCode=code; MP.code=code; MP.roomRef=ref;
+      MP._queueClaiming=false; MP._queueSeenMine=false; MP._queueHoldMine=false;
+      mpSetStatus('');
+      mpWatchQueue();
+      /* The table finishing while I wait ends the wait, with the same
+         "That table has finished" outcome as a lost table. */
+      mpListen(mpRef('meta'), 'value', function(snap){
+        var m=snap.val();
+        if(MP.queueing && (!m || m.status==='closed')) mpQueueTableGone();
+      });
+      mpRenderQueueWait();
+      if(MP._queueUiTimer) clearInterval(MP._queueUiTimer);
+      MP._queueUiTimer=setInterval(function(){
+        if(MP.queueing) mpRenderQueueWait();
+        else { clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
+      }, 1000);
+      /* The same one-time notification setup as joining a table, so
+         the "your seat is open" pop-up can reach this phone with the
+         app closed. Declining still queues — the in-app notice above
+         covers it while the game is open. */
+      setTimeout(pushMaybeAsk, 700);
+      toast('You\'re in the queue for table '+code+' — first come, first served ♠');
+    });
+  }).catch(function(){
+    mpSetStatus('Could not join the queue — check your connection and try again.');
+  });
+}
+function mpRenderQueueWait(){
+  var box=$('mpQueueBox'); if(!box) return;
+  if(!MP.queueing){ box.hidden=true; return; }
+  box.hidden=false;
+  var line=$('mpQueueLine'), cnt=$('mpQueueCount'), claim=$('mpQueueClaimBtn');
+  var hold=MP.queueHold;
+  if(hold && hold.uid===MP.uid && hold.until>Date.now()){
+    line.textContent='🎉 A seat opened at table '+MP._queueCode+' — it\'s being held for you!';
+    var secs=Math.max(0, Math.ceil((hold.until-Date.now())/1000));
+    cnt.textContent='Tap Join in the next '+Math.floor(secs/60)+':'+('0'+(secs%60)).slice(-2)+' to take the seat — after that it goes to the next person in line.';
+    if(claim) claim.style.display='block';
+    return;
+  }
+  if(claim) claim.style.display='none';
+  var entries=mpQueueEntries(), idx=-1;
+  entries.forEach(function(e,i){ if(e.uid===MP.uid) idx=i; });
+  if(idx<0){
+    line.textContent='You\'re in the queue for table '+MP._queueCode+'.';
+    cnt.textContent='Finding your place in line…';
+    return;
+  }
+  line.textContent='You\'re #'+(idx+1)+' in line for table '+MP._queueCode+'.';
+  cnt.textContent = entries.length>1
+    ? entries.length+' people are waiting for a seat at this table — seats go to the line in order.'
+    : 'You\'re first in line — the next seat that opens is yours.';
+}
+function mpQueueStopWait(){
+  MP.queueing=false; MP._queueClaiming=false; MP._queueSeenMine=false; MP._queueHoldMine=false;
+  if(MP._queueUiTimer){ clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
+  mpDetach();
+  MP._queueWatching=false;
+  MP.queue={}; MP.queueHold=null;
+  var box=$('mpQueueBox'); if(box) box.hidden=true;
+  MP._queueCode=null;
+  if(!MP.active){ MP.code=null; MP.roomRef=null; }
+}
+function mpLeaveQueue(silent){
+  if(!MP.queueing) return;
+  var ref=MP.roomRef, uid=MP.uid;
+  mpQueueStopWait();
+  if(ref && uid) ref.child('queue/'+uid).set(null).catch(function(){});
+  if(!silent) mpSetStatus('You left the queue.');
+}
+function mpQueuePassedOver(){
+  var code=MP._queueCode;
+  mpQueueStopWait();
+  mpOfferQueue(code, 'Your turn came up, but the seat went to the next person in line. Join the queue again to line back up.');
+  toast('The seat went to the next person in line.');
+}
+function mpQueueTableGone(){
+  if(!MP.queueing) return;
+  var ref=MP.roomRef, uid=MP.uid;
+  mpQueueStopWait();
+  if(ref && uid) ref.child('queue/'+uid).set(null).catch(function(){});
+  mpSetStatus('That table has finished — start or join a new one ♠');
+}
+/* Tapping Join on the waiting screen (or arriving from the push
+   pop-up, which lands in mpJoin and routes here): leave the queue,
+   release the hold, and take the held seat. */
+function mpClaimQueueSeat(){
+  var hold=MP.queueHold;
+  if(!MP.queueing || !hold || hold.uid!==MP.uid || !MP._queueCode) return;
+  if(hold.until<=Date.now()){ toast('That hold just ran out — the seat goes to the next person in line.'); mpRenderQueueWait(); return; }
+  var seat=hold.seat, code=MP._queueCode, ref=MP.db.ref('rooms/'+code);
+  MP._queueClaiming=true;
+  mpSetStatus('Taking your seat…');
+  ref.child('meta').once('value').then(function(msnap){
+    var meta=msnap.val();
+    if(!meta || meta.status==='closed') throw new Error('gone');
+    return ref.child('players').once('value').then(function(psnap){
+      var players=psnap.val()||{};
+      var occ=players[String(seat)];
+      if(occ && occ.uid!==MP.uid) throw new Error('taken');
+      return { meta:meta, players:players };
+    });
+  }).then(function(ctx){
+    var jobs=[
+      ref.child('queue/'+MP.uid).set(null).catch(function(){}),
+      ref.child('queueHold').set(null).catch(function(){})
+    ];
+    return Promise.all(jobs).then(function(){ return ctx; });
+  }).then(function(ctx){
+    var meta=ctx.meta;
+    mpQueueStopWait();
+    MP.code=code; MP.roomRef=ref;
+    if(meta.status==='playing'){
+      /* Mid-game: the same seat claim a join request makes, flagged
+         viaQueue — the host offered me this seat, so their phone seats
+         me at once instead of asking, and I'm dealt in from the next
+         hand like any accepted join. */
+      var entry={}; entry[String(seat)]={ uid:MP.uid, name:mpMyName(), pref:null, viaQueue:true };
+      return ref.child('players').update(entry).then(function(){
+        MP.meta=meta; MP.hostUid=meta.hostUid||null;
+        MP.mySeat=seat; MP.isHost=false; MP.joinPending=true; MP._joinResolved=false;
+        MP.seats=ctx.players; MP.seats[String(seat)]=entry[String(seat)];
+        selectedCount=meta.count;
+        if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
+        mpSetCancelReqVisible(true);
+        mpSetStatus('Taking your seat at table '+code+' — you\'re dealt in from the next hand…');
+        mpWatchJoinRequest();
+      });
+    }
+    /* Lobby: sit straight down, exactly like a normal lobby join. */
+    var entry2={}; entry2[String(seat)]={ uid:MP.uid, name:mpMyName() };
+    return ref.child('players').update(entry2).then(function(){
+      MP.active=true; MP.mySeat=seat;
+      MP.meta=meta; MP.hostUid=meta.hostUid||null;
+      MP.seats=ctx.players; MP.seats[String(seat)]=entry2[String(seat)];
+      MP.isHost=(meta.hostUid===MP.uid);
+      selectedCount=meta.count;
+      if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
+      mpSetStatus('');
+      mpSaveSession();
+      mpWatchLobby();
+      mpSetupPresence();
+      mpNotifyJoined();
+      mpEnterLobby();
+      toast('You\'re in — the seat from the queue is yours ♠');
+    });
+  }).catch(function(err){
+    MP._queueClaiming=false;
+    if(err && err.message==='gone'){ mpQueueTableGone(); return; }
+    if(err && err.message==='taken'){
+      mpSetStatus('That seat was just taken — you\'re still in the queue.');
+    } else {
+      mpSetStatus('Could not take the seat — check your connection and tap Join again.');
+    }
+    mpRenderQueueWait();
+  });
+}
+
 /* ================= Presence & reconnect =================
    Every phone at the table writes a presence heartbeat for its seat and
    registers an onDisconnect write, so closing the app, switching away, or
@@ -1891,6 +2249,11 @@ function mpSetupPresence(){
       if(!MP.active) return;
       mpRenderPresenceUI();
       mpCheckHostHandover();
+      /* The driving phone also minds the join queue on this tick:
+         expire an unclaimed seat hold, then offer any open seat to
+         the first person in line. */
+      mpQueueTick();
+      mpQueueMaybeOffer();
     }, 4000);
   }
   mpWatchPresence();
@@ -1990,6 +2353,11 @@ function mpReplaceWithAI(absSeat){
     }
   }
   mpRenderPresenceUI();
+  /* A seat just opened: if anyone is waiting in the queue, the seat is
+     held for the first person in line (the computer keeps playing it
+     until they claim it and are dealt in, exactly like an accepted
+     join request). With no queue, nothing changes here at all. */
+  mpQueueMaybeOffer();
   toast(nm+' was replaced by the computer — the game goes on ♠');
 }
 
@@ -2393,6 +2761,7 @@ function mpDetach(){
   MP.listeners.forEach(function(l){ try{ l.ref.off(l.evt, l.cb); }catch(e){} });
   MP.listeners=[];
   MP._pendingWatching=false;
+  MP._queueWatching=false;
 }
 
 /* ---- Room codes: 4 letters, claimed so hosts can't collide ----
@@ -2439,6 +2808,8 @@ function mpClaimCode(attempt){
 
 /* ---- Create / join ---- */
 function mpCreate(){
+  if(MP.queueing) mpLeaveQueue(true);
+  mpHideQueueOffer();
   mpSetStatus('Connecting…');
   mpConnect().then(function(){
     return mpClaimCode();
@@ -2459,22 +2830,42 @@ function mpCreate(){
     mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
   });
 }
-function mpJoinError(err){
+function mpJoinError(err, code){
   var m=(err && err.message)||'';
   if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
   else if(m==='started') mpSetStatus('That table has already started playing. Ask the host for a new table.');
-  else if(m==='full') mpSetStatus('That table is full.');
+  else if(m==='full'){
+    /* Full is not a dead end any more: offer a place in the queue. */
+    if(code) mpOfferQueue(code);
+    else mpSetStatus('That table is full.');
+  }
   else mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
 }
 function mpJoin(code, pref){
   code=(code||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
   if(code.length!==4){ mpSetStatus('A room code is 4 letters — check the code and try again.'); return; }
+  if(MP.queueing && MP._queueCode!==code) mpLeaveQueue(true);
+  mpHideQueueOffer();
   mpSetStatus('Connecting…');
   mpConnect().then(function(){
     var ref=MP.db.ref('rooms/'+code);
     return ref.child('meta').once('value').then(function(snap){
       var meta=snap.val();
       if(!meta || meta.status==='closed') throw new Error('noroom');
+      return ref.child('queueHold').once('value').then(function(hsnap){
+      var hold=hsnap.val();
+      if(hold && hold.uid===MP.uid && hold.until>Date.now()){
+        /* A seat at this table is being held for me from the queue —
+           claim it directly instead of joining as a walk-in. This is
+           also where tapping the "your seat is open" push pop-up
+           lands: it opens the game at this table's link. */
+        MP.queueing=true; MP._queueCode=code; MP.code=code; MP.roomRef=ref;
+        MP.queueHold=hold; MP._queueClaiming=false; MP._queueSeenMine=true;
+        mpWatchQueue();
+        mpRenderQueueWait();
+        mpClaimQueueSeat();
+        return;
+      }
       return ref.child('players').once('value').then(function(psnap){
         var players=psnap.val()||{};
         /* Reconnect: if this phone already holds a seat, it keeps that
@@ -2493,28 +2884,29 @@ function mpJoin(code, pref){
              more than one seat open, the requester first picks
              teammate or opponent; the pick rides with the request and
              the host seats them by it. */
-          if(pref===undefined && mpChoiceApplies(meta, players)){
+          if(pref===undefined && mpChoiceApplies(meta, mpBlockHeldSeat(players, hold))){
             mpAskJoinAs(meta, players, function(chosen){
-              mpRequestJoin(code, ref, meta, players, chosen);
+              mpRequestJoin(code, ref, meta, players, chosen, hold);
             });
             return;
           }
-          mpRequestJoin(code, ref, meta, players, pref);
+          mpRequestJoin(code, ref, meta, players, pref, hold);
           return;
         }
         if(!rejoin && meta.status!=='lobby') throw new Error('started');
         /* Partners table, more than one seat open, no pick yet: ask
            BEFORE claiming a seat, so the pick decides where they sit. */
-        if(!rejoin && pref===undefined && mpChoiceApplies(meta, players)){
+        if(!rejoin && pref===undefined && mpChoiceApplies(meta, mpBlockHeldSeat(players, hold))){
           mpAskJoinAs(meta, players, function(chosen){
-            mpJoinClaim(code, ref, meta, chosen).catch(mpJoinError);
+            mpJoinClaim(code, ref, meta, chosen).catch(function(e){ mpJoinError(e, code); });
           });
           return;
         }
         return mpJoinClaim(code, ref, meta, pref);
       });
+      });
     });
-  }).catch(mpJoinError);
+  }).catch(function(e){ mpJoinError(e, code); });
 }
 /* Claim a seat at a lobby table (or reclaim this phone's own seat on a
    reconnect). The players node is re-read at claim time: if the seat
@@ -2522,6 +2914,8 @@ function mpJoin(code, pref){
    them — was taken while they were choosing, they get the other open
    seat and a toast says so. */
 function mpJoinClaim(code, ref, meta, pref){
+  return ref.child('queueHold').once('value').then(function(hsnap){
+    var hold=hsnap.val();
   return ref.child('players').once('value').then(function(psnap){
     var players=psnap.val()||{};
     var mySeat=-1;
@@ -2529,7 +2923,9 @@ function mpJoinClaim(code, ref, meta, pref){
     var rejoin = mySeat>=0;
     var pick={ seat:-1, fellBack:false };
     if(!rejoin){
-      pick=mpPickSeat(meta, players, pref||null);
+      /* A seat held for the queue's first in line is not open, even
+         though nobody sits in it yet. */
+      pick=mpPickSeat(meta, mpBlockHeldSeat(players, hold), pref||null);
       mySeat=pick.seat;
     }
     if(mySeat<0) throw new Error('full');
@@ -2583,6 +2979,7 @@ function mpJoinClaim(code, ref, meta, pref){
           else if(pick.fellBack) toast('That seat was just taken — you\'re in the other open seat ♠');
         });
   });
+  });
 }
 
 /* ---- Joining a game already in progress: request, host decides ----
@@ -2596,14 +2993,18 @@ function mpJoinClaim(code, ref, meta, pref){
    read. Until the host lets them in, the seat keeps being played by the
    computer; an accepted player is dealt in from the next hand. */
 function mpSetCancelReqVisible(v){ var b=$('mpCancelReqBtn'); if(b) b.style.display=v?'block':'none'; }
-function mpRequestJoin(code, ref, meta, players, pref){
+function mpRequestJoin(code, ref, meta, players, pref, hold){
   /* The claim seat is picked by the teammate/opponent preference when
      one was chosen; the preference itself rides in the claim entry, so
      the host sees it with the request and can re-seat by it on accept
-     if the seats have shifted since the request was sent. */
-  var pick=mpPickSeat(meta, players, pref||null);
+     if the seats have shifted since the request was sent. A seat held
+     for the queue's first in line is not open to a walk-in. */
+  var pick=mpPickSeat(meta, mpBlockHeldSeat(players, hold), pref||null);
   var seat=pick.seat;
-  if(seat<0){ mpSetStatus('That table is full — every seat has a player. Ask the host to start a new table when this game ends.'); return; }
+  if(seat<0){
+    mpOfferQueue(code, 'That table is full — every seat has a player. Join the queue and you\'ll be first in line when a seat opens: you\'ll be told right here, and by a pop-up even if the app is closed.');
+    return;
+  }
   if(pick.fellBack) toast('Your first-choice seat was just taken — you\'re asking for the other open seat.');
   var entry={}; entry[String(seat)]={ uid:MP.uid, name:mpMyName(), pref:pref||null };
   ref.child('players').update(entry).then(function(){
@@ -2662,6 +3063,7 @@ function mpJoinAccepted(){
   mpRestoreTextInviteFlag();
   mpWatchGuestGame();
   mpWatchPending();
+  mpWatchQueue();
   mpSetupPresence();
   mpNotifyJoined();
   setTimeout(pushMaybeAsk, 700);
@@ -2692,6 +3094,11 @@ function mpCancelJoinRequest(silent){
    closing it returns to the waiting-for-the-host screen rather than
    stranding them on the start screen while their request is live. */
 function mpRestoreJoinUi(){
+  if(MP.queueing && MP._queueCode){
+    $('mpOverlay').classList.add('on');
+    mpRenderQueueWait();
+    return;
+  }
   if(MP.joinPending && MP.code){
     $('mpOverlay').classList.add('on');
     mpSetCancelReqVisible(true);
@@ -2717,6 +3124,23 @@ function mpHostCheckJoinRequests(){
     var gp=G.players[mpAbsToView(s)];
     if(gp && gp.uid===info.uid) continue; /* already a player in this game */
     if(MP.declinedUids[info.uid]) continue; /* already said no to this phone */
+    /* A claim from the person this table is holding a seat for — the
+       first in the join queue — is not a request to decide on: the
+       seat was already offered to them, so seat them at once. The
+       match is checked against the hold this phone wrote (kept in
+       memory, since the claim itself releases the hold node) and the
+       live hold mirror. */
+    if(info.viaQueue===true){
+      var holdFor=(MP.queueHold && MP.queueHold.uid===info.uid && MP.queueHold.seat===s)
+        || (MP._queueHoldWritten && MP._queueHoldWritten.uid===info.uid && MP._queueHoldWritten.seat===s && Date.now()<MP._queueHoldWritten.until+60000);
+      if(holdFor){
+        MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'approved', pref:null };
+        if(MP.queueHold && MP.queueHold.uid===info.uid) mpRef('queueHold').set(null).catch(function(){});
+        mpHostSync(); /* publish the acceptance in the public state at once */
+        toast((cleanName(info.name)||'A player')+' took the seat from the queue ♠');
+        continue;
+      }
+    }
     var cur=MP.joinRequests[String(s)];
     if(cur && cur.uid===info.uid) continue; /* already on screen */
     MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'pending', pref:(info.pref==='teammate'||info.pref==='opponent') ? info.pref : null };
@@ -2778,6 +3202,12 @@ function mpReseatTarget(r, claimed){
 function mpAcceptJoin(absSeat){
   var r=MP.joinRequests[String(absSeat)];
   if(!r) return;
+  /* A seat being held for the queue's first in line stays theirs
+     until the hold is claimed or runs out. */
+  if(MP.queueHold && MP.queueHold.until>Date.now() && MP.queueHold.seat===absSeat && MP.queueHold.uid!==r.uid){
+    toast('That seat is being held for the next person in the queue — they have a moment to claim it first.');
+    return;
+  }
   var target=mpReseatTarget(r, absSeat);
   if(target!==absSeat){
     /* Move the claim to the seat their pick names, then approve there:
@@ -2879,6 +3309,7 @@ function mpRenderLobby(){
 }
 function mpWatchLobby(){
   mpWatchPending();
+  mpWatchQueue();
   mpListen(mpRef('players'), 'value', function(snap){
     var prevUids={};
     if(MP.seats) Object.keys(MP.seats).forEach(function(k){
@@ -2903,6 +3334,10 @@ function mpWatchLobby(){
       if(info.uid!==MP.uid && (!MP.meta || MP.meta.status!=='playing')) mpAnnounceJoined(info.name);
     });
     if($('lobbyOverlay').classList.contains('on')) mpRenderLobby();
+    /* A seat emptying (a lobby player leaving, a claim moving) may
+       open a seat for the queue — the host offers it to the first
+       person in line. */
+    mpQueueMaybeOffer();
     /* Mid-game, a players entry the game doesn't know is a join request. */
     mpHostCheckJoinRequests();
   });
@@ -3284,6 +3719,9 @@ function mpApplyPublicNow(pub){
 
 /* ---- Leaving ---- */
 function mpLeaveTable(){
+  /* A player still waiting in the join queue just steps out of line —
+     there's no seat or hand to tidy up yet. */
+  if(MP.queueing){ mpLeaveQueue(true); return; }
   /* A player still waiting on a join request just takes their claim
      back — there's no seat or hand to tidy up yet. */
   if(MP.joinPending){ mpCancelJoinRequest(true); return; }
@@ -3311,7 +3749,11 @@ function mpLeaveTable(){
   MP.lastPub=null; MP.lastPubJson=''; MP.lastHandsJson=''; MP.lastBackupJson=''; MP._readySent=false; MP._allReady=false;
   MP.presence={}; MP.awaySince={}; MP.hostUid=null; MP._presenceReady=false; MP._takeoverBusy=false; MP._unknownHands={};
   MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
-  MP.pendingInvites={}; MP._localInviteSent=false; MP._joinedNote=null; MP._pubUids=null;
+  MP.pendingInvites={}; MP._localInviteSent=false; MP._textInviteCount=0; MP._joinedNote=null; MP._pubUids=null;
+  MP.queue={}; MP.queueHold=null; MP._queueWatching=false; MP._queueHoldWritten=null; MP._queueOfferCode=null;
+  if(MP._queueUiTimer){ clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
+  var qbox=$('mpQueueBox'); if(qbox) qbox.hidden=true;
+  var qbtn2=$('mpQueueBtn'); if(qbtn2) qbtn2.style.display='none';
   if(MP._joinedTimer){ clearTimeout(MP._joinedTimer); MP._joinedTimer=null; }
   if(MP._holdTimer){ clearTimeout(MP._holdTimer); MP._holdTimer=null; }
   MP._pendingPub=null; MP._ft=null; MP._lastTrick=null;
@@ -3328,16 +3770,29 @@ $('mpBtn').addEventListener('click', function(){
   document.querySelectorAll('#mpScoreSeg button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-mode')===selectedScoring); });
   mpSetStatus('');
   $('mpOverlay').classList.add('on');
+  if(MP.queueing) mpRenderQueueWait();
 });
 $('mpCloseBtn').addEventListener('click', function(){
   /* Backing out while a join request is waiting cancels the request —
      the host shouldn't be left deciding on someone who already left. */
   if(MP.joinPending) mpCancelJoinRequest(true);
+  /* Backing out while waiting in the queue leaves the queue, for the
+     same reason — the line shouldn't hold a place for a phone that
+     already walked away from the screen. */
+  if(MP.queueing) mpLeaveQueue(true);
+  mpHideQueueOffer();
   closeAll();
 });
 $('mpCancelReqBtn').addEventListener('click', function(){
   mpCancelJoinRequest(false);
   toast('Join request cancelled.');
+});
+$('mpQueueBtn').addEventListener('click', function(){
+  mpJoinQueue(MP._queueOfferCode || $('mpJoinInput').value);
+});
+$('mpQueueClaimBtn').addEventListener('click', mpClaimQueueSeat);
+$('mpQueueLeaveBtn').addEventListener('click', function(){
+  mpLeaveQueue(false);
 });
 $('mpInstallBtn').addEventListener('click', onInstallTap);
 $('lobbyInstallBtn').addEventListener('click', onInstallTap);
@@ -3424,7 +3879,7 @@ $('lobbyCopyBtn').addEventListener('click', function(){
       /* If the table is gone (finished, or the seat was replaced after a
          long absence), don't strand the player on this sheet. */
       setTimeout(function(){
-        if(!MP.active && !MP.joinPending){
+        if(!MP.active && !MP.joinPending && !MP.queueing && !MP._queueOfferCode){
           mpClearSession();
           closeAll();
           toast('That table has finished — start or join a new one ♠');
