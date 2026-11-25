@@ -1630,6 +1630,34 @@ function mpLoadSession(){
     return s;
   }catch(e){ return null; }
 }
+/* ---- Text/share invite line: make it stick across a refresh ----
+   The "Invite sent — waiting for someone to join…" line is sender-only:
+   a text/share invite doesn't say who it went to, so there's nothing in
+   the room to restore it from. Remember on this phone only, keyed by the
+   room code, that a text/share invite went out for this table. Rejoining
+   the same table (session resume or the ?room= link, lobby or mid-game)
+   restores the line; it clears when someone joins (mpAnnounceJoined) and
+   when this phone leaves the table (mpLeaveTable). Friend invites in
+   rooms/{code}/pendingInvites already live in the database and are
+   untouched by this. */
+var MP_TEXT_INVITE_PREFIX='spades.mpTextInvite.v1.';
+function mpSaveTextInviteFlag(){
+  if(!MP.code) return;
+  try{ localStorage.setItem(MP_TEXT_INVITE_PREFIX+MP.code, '1'); }catch(e){}
+}
+function mpClearTextInviteFlag(code){
+  var c=code||MP.code; if(!c) return;
+  try{ localStorage.removeItem(MP_TEXT_INVITE_PREFIX+c); }catch(e){}
+}
+function mpRestoreTextInviteFlag(){
+  if(!MP.code) return;
+  try{ if(localStorage.getItem(MP_TEXT_INVITE_PREFIX+MP.code)) MP._localInviteSent=true; }catch(e){}
+}
+function mpMarkTextInviteSent(){
+  MP._localInviteSent=true;
+  mpSaveTextInviteFlag();
+  mpRenderTableNotes();
+}
 /* The host's public state carries two HTML strings (the table message and
    the hand-result sheet). A host is another person's phone, so guests
    never inject that HTML raw: strip anything that can run code — script-
@@ -1688,7 +1716,7 @@ function mpInvite(){
     }).then(function(){
       /* The invite actually went out: show the sender-only waiting line
          on the table until the next player sits down. */
-      MP._localInviteSent=true; mpRenderTableNotes();
+      mpMarkTextInviteSent();
     }, function(err){
       /* The player closing the share sheet is not an error. Anything else:
          point them at the text-message fallback sitting right there. */
@@ -1712,8 +1740,9 @@ function mpInvite(){
        their own invites.
      • "Invite sent — waiting for someone to join…" after a text or
        share invite: local to the sender's phone only, because a text
-       invite doesn't say who it went to. Clears when the next player
-       sits down.
+       invite doesn't say who it went to. The phone remembers it (keyed
+       by room code) so the line survives a refresh; it clears when the
+       next player sits down or the sender leaves the table.
      • "X joined the table ♠" for a few seconds when a player sits
        down, on every phone at the table. */
 function mpFillTableNotes(el){
@@ -1761,6 +1790,7 @@ function mpRenderTableNotes(){
    still be there when they glance back at the table. */
 function mpAnnounceJoined(name){
   MP._localInviteSent=false;
+  mpClearTextInviteFlag();
   var who=cleanName(name||'')||'A player';
   MP._joinedNote={ name:who, until:Date.now()+12000 };
   if(MP._joinedTimer) clearTimeout(MP._joinedTimer);
@@ -2517,6 +2547,10 @@ function mpJoinClaim(code, ref, meta, pref){
           if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
           mpSetStatus('');
           mpSaveSession();
+          /* Rejoining this table: if this phone sent a text/share invite
+             for it earlier, bring the waiting line back (it survives a
+             pull-to-refresh now). A first-time join has no flag. */
+          mpRestoreTextInviteFlag();
           mpWatchLobby();
           mpSetupPresence();
           if(!rejoin){ mpNotifyJoined(); setTimeout(pushMaybeAsk, 700); }
@@ -2625,6 +2659,7 @@ function mpJoinAccepted(){
   MP.active=true;
   mpSetCancelReqVisible(false);
   mpSaveSession();
+  mpRestoreTextInviteFlag();
   mpWatchGuestGame();
   mpWatchPending();
   mpSetupPresence();
@@ -3252,6 +3287,9 @@ function mpLeaveTable(){
   /* A player still waiting on a join request just takes their claim
      back — there's no seat or hand to tidy up yet. */
   if(MP.joinPending){ mpCancelJoinRequest(true); return; }
+  /* Leaving the table retires this phone's text/share invite line for
+     good — the persisted flag goes with it (MP.code is still set here). */
+  mpClearTextInviteFlag();
   try{
     if(MP.roomRef && MP.mySeat>=0){
       /* Leaving on purpose is not "away": drop the presence heartbeat so
@@ -3357,8 +3395,8 @@ $('mpInviteBtn2').addEventListener('click', mpInvite);
 $('lobbyLeaveBtn').addEventListener('click', function(){ mpLeaveTable(); backToStart(); toast('You left the table.'); });
 /* Sending a text invite from the table lights the sender-only waiting
    line until the next player sits down (see mpRenderTableNotes). */
-$('lobbySmsBtn').addEventListener('click', function(){ MP._localInviteSent=true; mpRenderTableNotes(); });
-$('mpSmsBtn2').addEventListener('click', function(){ MP._localInviteSent=true; mpRenderTableNotes(); });
+$('lobbySmsBtn').addEventListener('click', function(){ mpMarkTextInviteSent(); });
+$('mpSmsBtn2').addEventListener('click', function(){ mpMarkTextInviteSent(); });
 $('lobbyCopyBtn').addEventListener('click', function(){
   var link=MP_LIVE_BASE+'?room='+MP.code;
   function done(){ toast('Join link copied — send it to your friends ♠'); }
