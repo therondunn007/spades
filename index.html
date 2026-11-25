@@ -434,7 +434,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 <div class="overlay" id="namesOverlay" role="dialog" aria-modal="true" aria-label="Player names">
   <div class="sheet">
     <h2>Player names</h2>
-    <p class="small muted">Play under your own name — it shows on the table, the scoreboard and in the announcements — and rename the computer players too. Leave a box empty (or type the default) to keep the standard name. Names are remembered for next time.</p>
+    <p class="small muted">Play under your own name — it shows on the table, the scoreboard and in the announcements, and everyone at a table sees it. The computer players' names are yours to set in solo play and stay on your phone; in a room, the host sets them so they match on every screen. Leave a box empty (or type the default) to keep the standard name. Names are remembered for next time.</p>
     <div id="namesForm"></div>
     <button class="big-btn" id="saveNamesBtn">Save names</button>
     <button class="ghost-btn" id="closeNamesBtn">Cancel</button>
@@ -478,7 +478,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <li><b>Nil (bid 0):</b> take no tricks for <b>+10</b>; take any trick and it's <b>−10</b>. In partners, a nil is scored on its own, separate from your partner's bid.</li>
       <li>The winner of each trick leads the next one. Dealer rotates every hand.</li>
       <li><b>Pick up where you left off:</b> the game saves itself as you play — close it any time, and when you come back your hand, the bids and the scores are right where you left them.</li>
-      <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name and rename the computer players too. Names are remembered for next time.</li>
+      <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name — everyone at the table sees it — and rename the computer players too. Your bot names stay on your phone in solo play; in a room the host sets the bot names so they match on every screen, and only the host can change them. Names are remembered for next time.</li>
     </ul>
     <button class="big-btn" id="closeHowBtn">Got it</button>
   </div>
@@ -1029,6 +1029,10 @@ function newDeal(){
      deal — before the cards go out, so they're dealt a hand like
      everyone else. (No-op in solo play and for guests.) */
   if(typeof mpAdoptApprovedJoins==='function') mpAdoptApprovedJoins();
+  /* Multiplayer host: seated friends keep the names in their seat
+     entries — if a friend renamed themselves at the table, the new
+     name reaches the game on this deal so every screen matches. */
+  if(typeof mpRefreshSeatNames==='function') mpRefreshSeatNames();
   var myEpoch=epoch;
   G.handNo++;
   G.dealer=(G.dealer+1)%G.count;
@@ -1472,39 +1476,130 @@ function nameField(label, value, placeholder, id){
   wrap.appendChild(lab); wrap.appendChild(inp);
   return wrap;
 }
+/* Who owns the bot names right now? Solo, they're this phone's alone
+   and never leave it. In a room the table must read the same on every
+   screen, so the bot names belong to the table: the host sets them,
+   they ride in the host's published table state, and guests' phones
+   just show them — a guest's own bot names stay saved on their phone
+   for their solo games and never touch the room. Your own name is
+   always yours, and everyone at the table sees it. */
+function namesRoomState(){
+  var inRoom = (typeof MP!=='undefined' && MP && MP.active && !!MP.code);
+  var count = selectedCount;
+  if(inRoom){
+    if(typeof mpTableCount==='function'){ try{ count=mpTableCount(); }catch(e){} }
+    else if(MP.meta && MP.meta.count) count=MP.meta.count;
+  }
+  return { inRoom:inRoom, isHost: inRoom && !!MP.isHost, count:count };
+}
+/* The computer-filled seats' names as they appear on this room's table
+   right now (a guest reads them off the host's mirrored state). Only
+   meaningful once the room's game is under way — before that there is
+   no shared table to read. */
+function roomBotNamesNow(){
+  var out=[];
+  if(!G || typeof MP==='undefined' || !MP || !MP.active) return out;
+  if(!MP.isHost && !MP.lastPub && !(MP.meta && MP.meta.status==='playing')) return out;
+  for(var v=1; v<G.count; v++){
+    var abs = (typeof mpViewToAbs==='function') ? mpViewToAbs(v) : v;
+    var seated = !!(MP.seats && MP.seats[String(abs)] && MP.seats[String(abs)].uid) || !!G.players[v].uid;
+    if(!seated) out.push(G.players[v].name);
+  }
+  return out;
+}
 function openNames(){
   closeAll();
+  var room=namesRoomState();
   var f=$('namesForm'); f.innerHTML='';
+  var note=document.createElement('p'); note.className='small muted';
+  if(room.inRoom && room.isHost){
+    note.innerHTML='You\'re <b>hosting this table</b> — the bot names below are the table\'s: everyone in the room sees the same ones, and only you can change them.';
+    f.appendChild(note);
+  } else if(room.inRoom){
+    note.innerHTML='You\'re at a table hosted by someone else, so the <b>bot names are set by the host</b> and match on every screen in the room — only the host can change them. Your own bot names stay saved on this phone for your solo games.';
+    f.appendChild(note);
+  }
   f.appendChild(nameField('Your name — shown on the table, the scoreboard and in announcements', customNames.you, 'You', 'nm-you'));
-  [2,3,4].forEach(function(count){
-    var h=document.createElement('h3'); h.textContent=count+'-player table'; f.appendChild(h);
+  if(room.inRoom && !room.isHost){
+    var gh=document.createElement('h3'); gh.textContent='Bot names at this table'; f.appendChild(gh);
+    var bots=roomBotNamesNow();
+    var gp=document.createElement('p'); gp.className='small muted';
+    gp.textContent = bots.length
+      ? 'The computer is playing as: '+bots.join(', ')+'. Only the host can rename them.'
+      : 'The host sets the computer players\' names for this table — they match on every screen once the game is under way.';
+    f.appendChild(gp);
+  } else if(room.inRoom && room.isHost){
+    var count=room.count;
+    var hh=document.createElement('h3'); hh.textContent=count+'-player table — bot names (shared with the room)'; f.appendChild(hh);
     AI_NAMES[count].forEach(function(def,i){
       var role = (count===4 && i===1) ? ' — your partner' : ' — opponent';
       f.appendChild(nameField(def+role, customNames.ai[count][i]||'', def, 'nm-'+count+'-'+i));
     });
-  });
+    var hp=document.createElement('p'); hp.className='small muted';
+    hp.textContent='Bot names for other table sizes can be changed any time you\'re not in a room — those stay on this phone for your solo games.';
+    f.appendChild(hp);
+  } else {
+    [2,3,4].forEach(function(count){
+      var h=document.createElement('h3'); h.textContent=count+'-player table'; f.appendChild(h);
+      AI_NAMES[count].forEach(function(def,i){
+        var role = (count===4 && i===1) ? ' — your partner' : ' — opponent';
+        f.appendChild(nameField(def+role, customNames.ai[count][i]||'', def, 'nm-'+count+'-'+i));
+      });
+    });
+  }
   $('namesOverlay').classList.add('on');
 }
 $('namesBtn').addEventListener('click', openNames);
 $('namesBtn1').addEventListener('click', openNames);
 $('closeNamesBtn').addEventListener('click', closeAll);
 $('saveNamesBtn').addEventListener('click', function(){
+  var room=namesRoomState();
   customNames.you=cleanName($('nm-you').value);
-  [2,3,4].forEach(function(count){
-    AI_NAMES[count].forEach(function(def,i){
-      var v=cleanName($('nm-'+count+'-'+i).value);
-      customNames.ai[count][i] = (v===def) ? '' : v;
+  /* A guest in a room gets no bot fields at all — the host's names own
+     the table, and this phone's saved bot names stay untouched for
+     solo play. The host in a room edits only the table's size. */
+  if(!(room.inRoom && !room.isHost)){
+    [2,3,4].forEach(function(count){
+      AI_NAMES[count].forEach(function(def,i){
+        var el=$('nm-'+count+'-'+i);
+        if(!el) return;
+        var v=cleanName(el.value);
+        customNames.ai[count][i] = (v===def) ? '' : v;
+      });
     });
-  });
-  /* Renaming mid-game updates the table that's already dealt. */
+  }
   if(G){
-    for(var i=0;i<G.count;i++) G.players[i].name=playerNameFor(G.count,i);
-    renderAll();
+    if(!room.inRoom){
+      /* Solo: renaming mid-game updates the table that's already dealt. */
+      for(var i=0;i<G.count;i++) G.players[i].name=playerNameFor(G.count,i);
+      renderAll();
+    } else if(room.isHost){
+      /* Host: only the computer seats take the table's bot names —
+         friends keep the names they brought with them. renderAll
+         publishes the new names to every phone in the room. */
+      for(var j=0;j<G.count;j++){
+        if(j===0 || !G.players[j].uid) G.players[j].name=playerNameFor(G.count,j);
+      }
+      renderAll();
+    }
+    /* A guest's table is a mirror of the host's — its bot names don't
+       change from this phone, by design. */
+  }
+  /* In a room, my own name lives in my seat entry too, so the lobby
+     shows the new one right away and the host's table picks it up. */
+  if(room.inRoom && typeof mpRef==='function' && MP.mySeat>=0){
+    try{
+      var myName=mpMyName();
+      mpRef('players/'+MP.mySeat).update({ name: myName }).catch(function(){});
+      if(MP.seats && MP.seats[String(MP.mySeat)]) MP.seats[String(MP.mySeat)].name=myName;
+    }catch(e){}
   }
   saveSettings();
   closeAll();
   beep(700,0.06,0.05);
-  toast('Names saved — see you at the table, '+playerNameFor(G?G.count:selectedCount,0)+' ♠');
+  if(room.inRoom && !room.isHost) toast('Your name is saved — bot names at this table are the host\'s to set ♠');
+  else if(room.inRoom) toast('Names saved — the whole table sees the new bot names ♠');
+  else toast('Names saved — see you at the table, '+playerNameFor(G?G.count:selectedCount,0)+' ♠');
 });
 document.querySelectorAll('.deck-option').forEach(function(btn){
   btn.addEventListener('click',function(){
@@ -3263,6 +3358,24 @@ function mpAdoptApprovedJoins(){
     }
     delete MP.joinRequests[k];
   });
+}
+
+/* Host, on each new deal: a seated friend's name is whatever their
+   seat entry says — they own their name, and renaming themselves at
+   the table updates their seat entry, so the game picks the new name
+   up here and publishes it to everyone. Computer seats are not
+   touched: their names are the host's table names. */
+function mpRefreshSeatNames(){
+  if(!MP.active || !MP.isHost || !G || !MP.seats) return;
+  for(var v=0; v<G.count; v++){
+    var p=G.players[v];
+    if(!p || !p.uid) continue;
+    var info=MP.seats[String(mpViewToAbs(v))];
+    if(info && info.uid===p.uid){
+      var nm=cleanName(info.name||'');
+      if(nm) p.name=nm;
+    }
+  }
 }
 
 /* ---- Lobby ---- */
