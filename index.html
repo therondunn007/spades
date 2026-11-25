@@ -1650,7 +1650,7 @@ function mpLoadSession(){
   }catch(e){ return null; }
 }
 /* ---- Text/share invite line: make it stick across a refresh ----
-   The "Invite sent — waiting for someone to join…" line is sender-only:
+   The "Invite sent to N people — waiting for someone to join…" line is sender-only:
    a text/share invite doesn't say who it went to, so there's nothing in
    the room to restore it from. Remember on this phone only, keyed by the
    room code, how many text/share invites went out for this table (the
@@ -1767,9 +1767,10 @@ function mpInvite(){
        written by the sender's phone — everyone seated sees them).
        The sender — and only the sender — gets a Cancel button on
        their own invites.
-     • "Invite sent — waiting for someone to join…" after a text or
-       share invite (with a count — "Invites sent to 3 people…" — once
-       more than one has gone out): local to the sender's phone only,
+     • "Invite sent to 1 person — waiting for someone to join…" after
+       a text or share invite, always showing how many people have been
+       invited from this phone ("Invites sent to 3 people…" once more
+       than one has gone out): local to the sender's phone only,
        because a text invite doesn't say who it went to. The phone
        remembers it (keyed by room code) so the line survives a
        refresh; it clears when the next player sits down or the sender
@@ -1810,7 +1811,7 @@ function mpFillTableNotes(el){
     var n=MP._textInviteCount||1;
     l.textContent = n>=2
       ? 'Invites sent to '+n+' people — waiting for someone to join…'
-      : 'Invite sent — waiting for someone to join…';
+      : 'Invite sent to 1 person — waiting for someone to join…';
     el.appendChild(l);
   }
   /* The join queue, for everyone seated: how many people are waiting
