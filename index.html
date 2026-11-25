@@ -379,6 +379,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button id="deckBtn"><span>🃏 Card deck</span><span class="hint" id="deckHint">Classic</span></button>
       <button id="namesBtn"><span>✎ Player names</span><span class="hint">yours + the table's</span></button>
       <button id="friendsBtn2"><span>👥 Friends</span><span class="hint">add by game name · <span class="fr-badge">invite in the app</span></span></button>
+      <button id="mpStepOutBtn2" style="display:none"><span>🚪 Step out of your table</span><span class="hint">table stays open — re-enter any time</span></button>
       <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
       <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
       <button id="soundBtn"><span>🔊 Sound</span><span class="hint" id="soundHint">on</span></button>
@@ -479,6 +480,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <li><b>Nil (bid 0):</b> take no tricks for <b>+10</b>; take any trick and it's <b>−10</b>. In partners, a nil is scored on its own, separate from your partner's bid.</li>
       <li>The winner of each trick leads the next one. Dealer rotates every hand.</li>
       <li><b>Pick up where you left off:</b> the game saves itself as you play — close it any time, and when you come back your hand, the bids and the scores are right where you left them.</li>
+      <li><b>Hosting a table:</b> need to step away from a table you're hosting? Tap <b>Step out</b> (in the lobby, or in the Menu mid-game) — the table, its code and your host seat stay exactly as they are, and you re-enter any time from <b>Play with friends → Re-enter my table</b> or by reopening the app. <b>Leave &amp; close the table</b> ends the table for everyone instead. Once every player has been gone for two hours, an empty table is tidied away on its own.</li>
       <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name — everyone at the table sees it — and rename the computer players too. Your bot names stay on your phone in solo play; in a room the host sets the bot names so they match on every screen, and only the host can change them. Names are remembered for next time.</li>
     </ul>
     <button class="big-btn" id="closeHowBtn">Got it</button>
@@ -500,6 +502,11 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
   <div class="sheet">
     <h2>Play with friends</h2>
     <p class="small muted">Play live against friends, each on their own phone. One person creates the table and shares the code; everyone else joins with it. Any seat nobody takes is played by the computer, just like solo play.</p>
+    <div id="mpReenterBox" hidden>
+      <h3>Your table is waiting</h3>
+      <p class="small muted" id="mpReenterText"></p>
+      <button class="big-btn" id="mpReenterBtn">↩ Re-enter my table</button>
+    </div>
     <h3>Create a table</h3>
     <p class="small muted" style="margin:2px 0 0">Table size</p>
     <div class="seg" id="mpCountSeg" role="group" aria-label="Multiplayer table size">
@@ -556,6 +563,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <div id="lobbyFriends"><p class="small muted">Open Friends once (start screen or Menu) to load your friends list here.</p></div>
     <p class="mp-status" id="lobbyStatus" role="status"></p>
     <button class="big-btn" id="lobbyStartBtn" style="display:none">Start the game</button>
+    <button class="ghost-btn" id="lobbyStepOutBtn" style="display:none">🚪 Step out — keep this table open</button>
+    <p class="small muted" id="lobbyStepOutNote" style="display:none;text-align:center;margin:2px 0 0">Stepping out keeps your table, its code and your host seat exactly as they are — come back any time from Play with friends → Re-enter my table, or just by reopening the app. Once everyone has been gone for two hours, the empty table is tidied away on its own.</p>
     <button class="ghost-btn" id="lobbyLeaveBtn">Leave table</button>
   </div>
 </div>
@@ -1426,7 +1435,7 @@ function renderAll(){
 
 /* ================= Overlays & menu wiring ================= */
 function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
-$('menuBtn').addEventListener('click',function(){ closeAll(); $('menuOverlay').classList.add('on'); });
+$('menuBtn').addEventListener('click',function(){ closeAll(); var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none'; $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
   var count=G?G.count:selectedCount;
@@ -1734,7 +1743,7 @@ function mpRoomLink(){ return MP_LIVE_BASE+'?room='+MP.code; }
 var MP_SESSION_KEY='spades.mpSession.v1';
 function mpSaveSession(){
   if(!MP.active || !MP.code) return;
-  try{ localStorage.setItem(MP_SESSION_KEY, JSON.stringify({ code:MP.code, seat:MP.mySeat, savedAt:Date.now() })); }catch(e){}
+  try{ localStorage.setItem(MP_SESSION_KEY, JSON.stringify({ code:MP.code, seat:MP.mySeat, host:!!MP.isHost, savedAt:Date.now() })); }catch(e){}
 }
 function mpClearSession(){ try{ localStorage.removeItem(MP_SESSION_KEY); }catch(e){} }
 function mpLoadSession(){
@@ -3425,6 +3434,11 @@ function mpEnterLobby(){
     ? 'Share this code — or send the link — and your friends tap straight into this table. Seats nobody takes are played by the computer.'
     : 'You\'re in! When the host starts the game, your cards appear here. Seats nobody takes are played by the computer.';
   $('lobbyStartBtn').style.display = MP.isHost ? 'block' : 'none';
+  /* Only the host can step out — and only the host's plain Leave
+     closes the table, so for the host it says exactly that. */
+  $('lobbyStepOutBtn').style.display = MP.isHost ? 'block' : 'none';
+  $('lobbyStepOutNote').style.display = MP.isHost ? 'block' : 'none';
+  $('lobbyLeaveBtn').textContent = MP.isHost ? 'Leave & close the table' : 'Leave table';
   $('lobbyOverlay').classList.add('on');
   mpUpdateInviteUI();
   mpRenderLobby();
@@ -3914,6 +3928,96 @@ function mpLeaveTable(){
   var bar=$('mpBar'); if(bar) bar.hidden=true;
 }
 
+/* ---- Stepping out (host): exit the room without losing it ----
+   Leaving the normal way retires the host's seat and, in the lobby,
+   closes the table for everyone. Stepping out is the gentler exit:
+   the seat stays the host's, the room stays open under the same code,
+   and this phone is simply marked away — friends at the table see
+   "Away — waiting to reconnect", exactly as if the app had been
+   closed. Two deliberate differences from mpLeaveTable:
+   - the saved session is KEPT, so re-entering is one tap (Play with
+     friends → Re-enter my table) or automatic on the next app open;
+   - presence is written as away with a fresh lastSeen instead of
+     being deleted, so the two-hour empty-room cleanup measures the
+     two hours from when the seat actually went quiet.
+   The text-invite waiting line is kept too, so it restores on
+   re-entry like any other reconnect. If a game is in progress,
+   hosting hands over to a connected player after the usual grace
+   period so play never stalls, and the host rejoins at their own
+   seat; in the lobby nothing changes hands at all. Returns the room
+   code stepped out of (for the toast), or null when not at a table. */
+function mpStepOut(){
+  if(!MP.active || !MP.code) return null;
+  var code=MP.code;
+  try{
+    if(MP.roomRef && MP.mySeat>=0){
+      var pref=mpRef('presence/'+MP.mySeat);
+      /* Cancel the disconnect write first: the away state below is
+         stamped now, and nothing should re-stamp it when this phone
+         later closes for real. */
+      try{ pref.onDisconnect().cancel(); }catch(e){}
+      var stamp=(window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now();
+      pref.set({ uid:MP.uid, name:mpMyName(), connected:false, lastSeen:stamp }).catch(function(){});
+    }
+  }catch(e){}
+  /* Keep the session — that is the whole point of stepping out. */
+  mpSaveSession();
+  if(MP._presenceTimer){ clearInterval(MP._presenceTimer); MP._presenceTimer=null; }
+  if(MP._uiTimer){ clearInterval(MP._uiTimer); MP._uiTimer=null; }
+  mpDetach();
+  MP.active=false; MP.isHost=false; MP.code=null; MP.mySeat=-1; MP.seats=null;
+  MP.lastPub=null; MP.lastPubJson=''; MP.lastHandsJson=''; MP.lastBackupJson=''; MP._readySent=false; MP._allReady=false;
+  MP.presence={}; MP.awaySince={}; MP.hostUid=null; MP._presenceReady=false; MP._takeoverBusy=false; MP._unknownHands={};
+  MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
+  MP.pendingInvites={}; MP._localInviteSent=false; MP._textInviteCount=0; MP._joinedNote=null; MP._pubUids=null;
+  MP.queue={}; MP.queueHold=null; MP._queueWatching=false; MP._queueHoldWritten=null; MP._queueOfferCode=null;
+  if(MP._queueUiTimer){ clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
+  var qbox=$('mpQueueBox'); if(qbox) qbox.hidden=true;
+  var qbtn2=$('mpQueueBtn'); if(qbtn2) qbtn2.style.display='none';
+  if(MP._joinedTimer){ clearTimeout(MP._joinedTimer); MP._joinedTimer=null; }
+  if(MP._holdTimer){ clearTimeout(MP._holdTimer); MP._holdTimer=null; }
+  MP._pendingPub=null; MP._ft=null; MP._lastTrick=null;
+  mpSetCancelReqVisible(false);
+  mpReadyListening=false; mpIntentsListening=false;
+  var bar=$('mpBar'); if(bar) bar.hidden=true;
+  return code;
+}
+
+/* ---- Re-entering a table this phone stepped out of ----
+   The Play-with-friends sheet shows a Re-enter button whenever this
+   phone holds a saved table session and isn't at a table right now —
+   most often because the host stepped out. Joining by the saved code
+   takes the ordinary rejoin path: the seat comes back exactly as it
+   was left, and so does the hosting when it never handed over. */
+function mpRefreshReenter(){
+  var box=$('mpReenterBox'); if(!box) return;
+  var sess=MP.active ? null : mpLoadSession();
+  if(!sess || !sess.code){ box.hidden=true; return; }
+  box.hidden=false;
+  var btn=$('mpReenterBtn');
+  if(btn) btn.textContent='↩ Re-enter my table · '+sess.code;
+  var txt=$('mpReenterText');
+  if(txt) txt.textContent = sess.host
+    ? 'You stepped out of the table you\'re hosting. It\'s still open under this code — step straight back in as host.'
+    : 'You were at this table and your seat was kept for you — step straight back in.';
+}
+function mpReenter(){
+  var sess=mpLoadSession();
+  if(!sess || !sess.code){ mpRefreshReenter(); return; }
+  $('mpJoinInput').value=sess.code;
+  mpJoin(sess.code);
+  /* If the table is gone (finished, or swept away after everyone had
+     been gone for two hours), don't leave a dead Re-enter button
+     behind — same safety net as the automatic session resume. */
+  setTimeout(function(){
+    if(!MP.active && !MP.joinPending && !MP.queueing && !MP._queueOfferCode
+       && !$('joinAsOverlay').classList.contains('on')){
+      mpClearSession();
+      mpRefreshReenter();
+    }
+  }, 9000);
+}
+
 /* ---- Wiring ---- */
 $('mpBtn').addEventListener('click', function(){
   closeAll();
@@ -3921,6 +4025,7 @@ $('mpBtn').addEventListener('click', function(){
   document.querySelectorAll('#mpCountSeg button').forEach(function(b){ b.classList.toggle('sel', parseInt(b.getAttribute('data-n'),10)===selectedCount); });
   document.querySelectorAll('#mpScoreSeg button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-mode')===selectedScoring); });
   mpSetStatus('');
+  mpRefreshReenter();
   $('mpOverlay').classList.add('on');
   if(MP.queueing) mpRenderQueueWait();
 });
@@ -4000,6 +4105,21 @@ $('lobbyStartBtn').addEventListener('click', mpHostStart);
 $('lobbyInviteBtn').addEventListener('click', mpInvite);
 $('mpInviteBtn2').addEventListener('click', mpInvite);
 $('lobbyLeaveBtn').addEventListener('click', function(){ mpLeaveTable(); backToStart(); toast('You left the table.'); });
+/* Stepping out (host): exit the room but keep it — seat, code and
+   hosting all stay put, and the saved session makes re-entering one
+   tap. backToStart's own mpLeaveTable call is a no-op here because
+   mpStepOut has already stood this phone down. */
+$('lobbyStepOutBtn').addEventListener('click', function(){
+  var code=mpStepOut();
+  backToStart();
+  toast('You stepped out — table '+(code||'')+' stays open. Re-enter any time from Play with friends ♠');
+});
+$('mpStepOutBtn2').addEventListener('click', function(){
+  var code=mpStepOut();
+  backToStart();
+  toast('You stepped out — table '+(code||'')+' stays open and the game carries on. Re-enter any time from Play with friends ♠');
+});
+$('mpReenterBtn').addEventListener('click', mpReenter);
 /* Sending a text invite from the table lights the sender-only waiting
    line until the next player sits down (see mpRenderTableNotes). */
 $('lobbySmsBtn').addEventListener('click', function(){ mpMarkTextInviteSent(); });
