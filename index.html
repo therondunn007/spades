@@ -81,14 +81,16 @@ button{font-family:inherit;cursor:pointer}
 /* ---------- Table ---------- */
 .table-zone{position:relative;margin-top:4px}
 /* Seats are arranged around the table: your partner sits across from
-   you (top), the opponents sit on your left and right, and the trick
-   area is the centre of the table. In a 3-player game the two
-   opponents flank you; heads-up, the one opponent sits across. */
-.table-grid{display:grid;gap:8px;grid-template-columns:minmax(88px,1fr) minmax(0,2.1fr) minmax(88px,1fr);grid-template-areas:". top ." "left center right";margin-bottom:2px}
+   you (top), the trick area is the centre of the table, and the two
+   opponents sit down at the bottom corners — left and right, right
+   beside your own seat and hand. In a 3-player game the two opponents
+   take those same bottom corners; heads-up, the one opponent sits
+   across. */
+.table-grid{display:grid;gap:8px;grid-template-columns:minmax(88px,1fr) minmax(0,2.1fr) minmax(88px,1fr);grid-template-areas:". top ." ". center ." "left . right";margin-bottom:2px}
 .seat-slot{display:flex;justify-content:center;min-width:0}
 .seat-top{grid-area:top}
-.seat-left{grid-area:left;align-self:center}
-.seat-right{grid-area:right;align-self:center}
+.seat-left{grid-area:left;justify-content:flex-end}
+.seat-right{grid-area:right;justify-content:flex-start}
 .table-grid .trick-area{grid-area:center}
 .opp{min-width:0;width:100%;max-width:170px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 10px;text-align:center}
 .opp.partner{border-color:rgba(212,175,55,.55)}
@@ -939,6 +941,14 @@ function normalizeNames(n){
 function cleanName(s){
   return (s||'').replace(/[<>&"']/g,'').replace(/\s+/g,' ').trim().slice(0,14);
 }
+/* Escape a name (or any player-supplied text) before it is interpolated
+   into innerHTML. Names at a multiplayer table are set by other people
+   and arrive through the shared table state, so they are never trusted
+   as markup — this is applied at every name sink, whatever path the
+   name took to get into the game. */
+function escHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function playerNameFor(count, idx){
   if(idx===0) return customNames.you || 'You';
   var c = customNames.ai[count] ? customNames.ai[count][idx-1] : '';
@@ -1120,7 +1130,7 @@ function newDeal(){
   /* Multiplayer host: a fresh deal clears everyone's Ready taps. */
   if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && typeof mpResetReady==='function') mpResetReady();
   renderAll();
-  setMsg('Hand '+G.handNo+' — <b>'+G.players[G.dealer].name+'</b> dealt. <b>Look over your cards below</b>, then tap <b>Ready</b> when you want to bid.');
+  setMsg('Hand '+G.handNo+' — <b>'+escHtml(G.players[G.dealer].name)+'</b> dealt. <b>Look over your cards below</b>, then tap <b>Ready</b> when you want to bid.');
   /* No bidding timer: the player reviews their hand for as long as they
      like and taps Ready (see startBidding) to move on to bidding. */
 }
@@ -1152,7 +1162,7 @@ function startBidding(){
   G.phase='bidding';
   beep(660,0.06,0.05);
   renderAll();
-  setMsg('Hand '+G.handNo+' — bidding. <b>'+G.players[G.current].name+'</b> '+(G.current===0?'— that\'s you.':'bids first.'));
+  setMsg('Hand '+G.handNo+' — bidding. <b>'+escHtml(G.players[G.current].name)+'</b> '+(G.current===0?'— that\'s you.':'bids first.'));
   nextBid();
 }
 function nextBid(){
@@ -1161,7 +1171,7 @@ function nextBid(){
     G.phase='playing';
     G.leader=(G.dealer+1)%G.count; G.current=G.leader;
     renderAll();
-    setMsg('Bidding done. <b>'+G.players[G.leader].name+'</b> leads the first trick — spades are fair game from the start.');
+    setMsg('Bidding done. <b>'+escHtml(G.players[G.leader].name)+'</b> leads the first trick — spades are fair game from the start.');
     scheduleAI();
     return;
   }
@@ -1175,7 +1185,7 @@ function takeBid(idx){
   if(!G||G.phase!=='bidding') return;
   /* Multiplayer host: a friend's bid arrives as a room write — wait for it. */
   if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && G.players[idx].remote){
-    setMsg('Waiting on <b>'+G.players[idx].name+'</b> to bid…');
+    setMsg('Waiting on <b>'+escHtml(G.players[idx].name)+'</b> to bid…');
     renderAll(); return;
   }
   if(G.players[idx].human){ showBidUI(); return; }
@@ -1183,7 +1193,7 @@ function takeBid(idx){
   setTimeout(function(){
     if(myEpoch!==epoch||!G||G.phase!=='bidding') return;
     G.players[idx].bid=aiBid(G.players[idx]);
-    setMsg('<b>'+G.players[idx].name+'</b> bids '+(G.players[idx].bid===0?'<b>Nil</b>':'<b>'+G.players[idx].bid+'</b>')+'.');
+    setMsg('<b>'+escHtml(G.players[idx].name)+'</b> bids '+(G.players[idx].bid===0?'<b>Nil</b>':'<b>'+G.players[idx].bid+'</b>')+'.');
     renderAll(); nextBid();
   }, 620);
 }
@@ -1316,7 +1326,7 @@ function playCard(pIdx, card){
   if(G.trick.length===1){
     /* A lead card starts a new trick: replace the previous trick's
        announcement right away, so it never lingers over this trick. */
-    setMsg('<b>'+G.players[pIdx].name+'</b> leads trick '+G.trickNo+'.');
+    setMsg('<b>'+escHtml(G.players[pIdx].name)+'</b> leads trick '+G.trickNo+'.');
   }
   if(G.trick.length===G.count){
     /* Announce the winner NOW, while the finished trick is still on the
@@ -1326,7 +1336,7 @@ function playCard(pIdx, card){
     var wNow=G.trick[trickWinnerIdx(G.trick)].p;
     G.phase='trickEnd';
     if(wNow===0) sndWin();
-    setMsg('<b>'+G.players[wNow].name+'</b> takes trick '+G.trickNo+'.');
+    setMsg('<b>'+escHtml(G.players[wNow].name)+'</b> takes trick '+G.trickNo+'.');
     renderAll();
     var myEpoch=epoch;
     setTimeout(function(){ if(myEpoch===epoch) finishTrick(); }, 1250);
@@ -1345,7 +1355,7 @@ function finishTrick(){
   G.trick=[]; G.trickNo++; G.leader=w; G.current=w; G.phase='playing';
   renderAll();
   if(G.players[0].hand.length===0){ endHand(); return; }
-  setMsg(w===0 ? '<b>'+G.players[0].name+'</b> took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+G.players[w].name+'</b> leads trick '+G.trickNo+'.');
+  setMsg(w===0 ? '<b>'+escHtml(G.players[0].name)+'</b> took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+escHtml(G.players[w].name)+'</b> leads trick '+G.trickNo+'.');
   scheduleAI();
 }
 function endHand(){
@@ -1383,11 +1393,11 @@ function endHand(){
   }
   renderScores();
   var html='<table class="score-table"><tr><th>Player / team</th><th>Hand result</th><th>Total</th></tr>';
-  rows.forEach(function(r){ html+='<tr><td>'+r.name+'</td><td style="text-align:right">'+r.note+'</td><td><b>'+r.total+'</b></td></tr>'; });
+  rows.forEach(function(r){ html+='<tr><td>'+escHtml(r.name)+'</td><td style="text-align:right">'+escHtml(r.note)+'</td><td><b>'+r.total+'</b></td></tr>'; });
   html+='</table>';
   if(G.over){
     $('resultTitle').textContent='🏆 '+gameWinner.name+' win'+(gameWinner.members.length>1?'':'s')+' the game!';
-    html+='<p><b>'+gameWinner.name+'</b> reached '+entityScoreOf(gameWinner.members[0])+' points — first to 35 takes it. Nice game!</p>';
+    html+='<p><b>'+escHtml(gameWinner.name)+'</b> reached '+entityScoreOf(gameWinner.members[0])+' points — first to 35 takes it. Nice game!</p>';
     $('resultBtn').textContent='Play again — fresh game';
     sndWin();
   } else {
@@ -1421,7 +1431,7 @@ function renderScores(){
     var tricks=ent.members.reduce(function(a,mi){return a+G.players[mi].tricks;},0);
     var div=document.createElement('div');
     div.className='score-card'+(ent.members.indexOf(0)>=0?' me':'');
-    div.innerHTML='<div class="who">'+ent.name+'</div><div class="pts">'+ent.score+' <span style="font-size:13px" class="muted">/ 35</span></div><div class="sub">Bid '+bids+' · Tricks '+tricks+'</div><div class="progress"><i style="width:'+Math.max(0,Math.min(100,ent.score/35*100))+'%"></i></div>';
+    div.innerHTML='<div class="who">'+escHtml(ent.name)+'</div><div class="pts">'+ent.score+' <span style="font-size:13px" class="muted">/ 35</span></div><div class="sub">Bid '+bids+' · Tricks '+tricks+'</div><div class="progress"><i style="width:'+Math.max(0,Math.min(100,ent.score/35*100))+'%"></i></div>';
     strip.appendChild(div);
   });
   $('menuState').textContent='Hand '+G.handNo+' · Scoring: '+SCORING_NAMES[scoringMode()]+' · '+(G.over?'Game over.':'Game in progress — scores above.');
@@ -1430,9 +1440,10 @@ function renderAll(){
   if(!G) return;
   renderScores();
   /* Seats around the table: your partner sits across from you (the
-     top slot), the opponents sit on your left and right. In a
-     3-player game the two opponents flank you; heads-up, the single
-     opponent sits across. */
+     top slot), the opponents sit at the bottom-left and bottom-right
+     corners, beside your own seat. In a 3-player game the two
+     opponents take those same corners; heads-up, the single opponent
+     sits across. */
   var seatSlots={ top:$('seatTop'), left:$('seatLeft'), right:$('seatRight') };
   Object.keys(seatSlots).forEach(function(k){ if(seatSlots[k]) seatSlots[k].innerHTML=''; });
   var slotFor=function(i){
@@ -1449,7 +1460,7 @@ function renderAll(){
       if(typeof MP!=='undefined' && MP && MP.active && typeof mpIsViewSeatAway==='function') away=mpIsViewSeatAway(i);
       var div=document.createElement('div');
       div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'')+(away?' away':'')+((G.count===4&&i===2)?' partner':'');
-      div.innerHTML='<div class="nm">'+p.name+(G.count===4&&i===2?' 🤝':'')+(away?' ⏳':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+(away?'<br>⏳ Away — waiting to reconnect':'')+'</div>';
+      div.innerHTML='<div class="nm">'+escHtml(p.name)+(G.count===4&&i===2?' 🤝':'')+(away?' ⏳':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+(away?'<br>⏳ Away — waiting to reconnect':'')+'</div>';
       var slot=seatSlots[slotFor(i)];
       if(slot) slot.appendChild(div);
     })(i);
@@ -2697,7 +2708,7 @@ function mpBecomeHost(backup){
   else if(G && G.phase==='playing') scheduleAI();
   else if(G && G.phase==='review') mpCheckReady();
   toast('You\'re hosting the table now — the game keeps going ♠');
-  setMsg('<b>'+mpMyName()+'</b> is hosting the table now — play continues.');
+  setMsg('<b>'+escHtml(mpMyName())+'</b> is hosting the table now — play continues.');
   mpHostSync();
   return true;
 }
@@ -3835,7 +3846,7 @@ function mpApplyIntent(absSeat, intent){
     var bv=parseInt(intent.value,10);
     if(isNaN(bv) || bv<0 || bv>G.cardsPer) return; /* bids are numbers in range, nothing else */
     p.bid=bv;
-    setMsg('<b>'+p.name+'</b> bids '+(bv===0?'<b>Nil</b>':'<b>'+bv+'</b>')+'.');
+    setMsg('<b>'+escHtml(p.name)+'</b> bids '+(bv===0?'<b>Nil</b>':'<b>'+bv+'</b>')+'.');
     renderAll(); nextBid();
   } else if(intent.type==='play'){
     if(G.phase!=='playing' || G.current!==seat || !intent.card) return;
@@ -5098,7 +5109,7 @@ function frDoSearch(){
   }).then(function(snap){
     var val=snap.val()||{};
     var keys=Object.keys(val).sort();
-    if(!keys.length){ box.innerHTML='<p class="small muted">No enrolled game names start with “'+q+'” yet.</p>'; return; }
+    if(!keys.length){ box.innerHTML='<p class="small muted">No enrolled game names start with “'+escHtml(q)+'” yet.</p>'; return; }
     box.innerHTML='';
     keys.forEach(function(h){ box.appendChild(frPlayerRow(val[h], h)); });
     if(keys.length>=FR_SEARCH_CAP) frSetStatus('frSearchStatus','Showing the first '+FR_SEARCH_CAP+' matches — type more letters to narrow it down.');
