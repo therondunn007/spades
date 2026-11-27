@@ -80,8 +80,19 @@ button{font-family:inherit;cursor:pointer}
 
 /* ---------- Table ---------- */
 .table-zone{position:relative;margin-top:4px}
-.opponents{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:8px}
-.opp{min-width:104px;max-width:170px;flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 10px;text-align:center}
+/* Seats are arranged around the table: your partner sits across from
+   you (top), the opponents sit on your left and right, and the trick
+   area is the centre of the table. In a 3-player game the two
+   opponents flank you; heads-up, the one opponent sits across. */
+.table-grid{display:grid;gap:8px;grid-template-columns:minmax(88px,1fr) minmax(0,2.1fr) minmax(88px,1fr);grid-template-areas:". top ." "left center right";margin-bottom:2px}
+.seat-slot{display:flex;justify-content:center;min-width:0}
+.seat-top{grid-area:top}
+.seat-left{grid-area:left;align-self:center}
+.seat-right{grid-area:right;align-self:center}
+.table-grid .trick-area{grid-area:center}
+.opp{min-width:0;width:100%;max-width:170px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 10px;text-align:center}
+.opp.partner{border-color:rgba(212,175,55,.55)}
+.seat-left .opp .backs,.seat-right .opp .backs{font-size:13px;letter-spacing:1px}
 .opp.turn{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,175,55,.45)}
 .opp .nm{font-weight:bold;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .opp .dt{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5}
@@ -286,6 +297,17 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .fr-confirm-btns button.danger{background:var(--danger);color:#fff;border:none}
 .fr-confirm-btns button:active{transform:scale(.97)}
 .fr-confirm-btns button[disabled]{opacity:.45}
+/* ---------- Table chat (text + voice) ---------- */
+.chat-list{max-height:36dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 12px;background:rgba(0,0,0,.22);display:grid;gap:7px;margin-top:10px}
+.chat-msg{font-family:Verdana,sans-serif;font-size:14px;line-height:1.5;overflow-wrap:break-word}
+.chat-msg b{color:var(--gold-soft)}
+.chat-msg.me b{color:#9fd48f}
+.chat-msg .chat-when{color:var(--muted);font-size:11.5px;white-space:nowrap}
+.chat-compose{display:flex;gap:8px;margin-top:10px}
+.chat-compose .fr-input{flex:1;min-width:0}
+.chat-compose button{flex:none;background:var(--gold);color:#231a02;border:none;border-radius:10px;padding:9px 16px;font-size:15px;font-weight:bold}
+.chat-compose button:active{transform:scale(.97)}
+#reshuffleBtn{margin-top:12px}
 </style>
 </head>
 <body data-deck="classic">
@@ -341,6 +363,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <div class="mp-bar-row">
         <span class="mp-bar-info" id="mpBarInfo"></span>
         <button class="mp-bar-btn" id="mpInviteBtn2" type="button">📤 Invite</button>
+        <button class="mp-bar-btn" id="mpChatBtn" type="button" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);font-weight:normal">💬 Chat<span id="mpChatBadge"></span></button>
+        <button class="mp-bar-btn" id="mpVoiceEndBtn" type="button" style="display:none;background:var(--danger);color:#fff">🔇 End voice chat</button>
         <button class="mp-bar-btn" id="mpFriendsBtn" type="button" style="background:transparent;color:var(--text);border:1px solid rgba(255,255,255,.3);font-weight:normal">👥 Friends <span class="fr-badge"></span></button>
         <a class="mp-bar-btn" id="mpSmsBtn2" href="#">💬 Text invite</a>
       </div>
@@ -350,8 +374,12 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <div class="mp-table-notes" id="mpTableNotes"></div>
     </div>
     <div class="table-zone">
-      <div class="opponents" id="opponents"></div>
-      <div class="trick-area" id="trickArea"><div class="trick-empty">Bidding first — then the trick cards land here.</div></div>
+      <div class="table-grid">
+        <div class="seat-slot seat-top" id="seatTop"></div>
+        <div class="seat-slot seat-left" id="seatLeft"></div>
+        <div class="trick-area" id="trickArea"><div class="trick-empty">Bidding first — then the trick cards land here.</div></div>
+        <div class="seat-slot seat-right" id="seatRight"></div>
+      </div>
       <div class="msg" id="msg" aria-live="polite">Welcome to the table.</div>
       <div class="hand-label"><span id="handInfo">Your hand</span><span id="trickInfo"></span></div>
       <div class="hand" id="hand"></div>
@@ -361,6 +389,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
         <button class="big-btn" id="readyBidBtn">Ready — make my bid →</button>
         <p class="small muted" style="margin:9px 0 0">Bidding won't start until you tap Ready.</p>
       </div>
+      <button class="ghost-btn" id="reshuffleBtn">🔀 Reshuffle &amp; start a new game</button>
     </div>
   </section>
 
@@ -459,6 +488,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <h2 id="resultTitle">Hand over</h2>
     <div id="resultBody"></div>
     <button class="big-btn" id="resultBtn">Next deal</button>
+    <button class="ghost-btn" id="resultChatBtn" style="display:none">💬 Table chat — talk it over with the table</button>
     <button class="ghost-btn" id="resultRestartBtn">↻ Restart game from scratch</button>
   </div>
 </div>
@@ -482,6 +512,9 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <li><b>Pick up where you left off:</b> the game saves itself as you play — close it any time, and when you come back your hand, the bids and the scores are right where you left them.</li>
       <li><b>Hosting a table:</b> need to step away from a table you're hosting? Tap <b>Step out</b> (in the lobby, or in the Menu mid-game) — the table, its code and your host seat stay exactly as they are, and you re-enter any time from <b>Play with friends → Re-enter my table</b> or by reopening the app. <b>Leave &amp; close the table</b> ends the table for everyone instead. Once every player has been gone for two hours, an empty table is tidied away on its own.</li>
       <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name — everyone at the table sees it — and rename the computer players too. Your bot names stay on your phone in solo play; in a room the host sets the bot names so they match on every screen, and only the host can change them. Names are remembered for next time.</li>
+      <li><b>Seats around the table:</b> in a partners game your partner sits <b>across from you</b>, with an opponent on your <b>left</b> and one on your <b>right</b> — just like a real table. Heads-up, your opponent sits across; with 3 players, the two opponents sit either side of you.</li>
+      <li><b>Reshuffle (solo only):</b> the <b>🔀 Reshuffle &amp; start a new game</b> button under your hand starts a brand-new game with a fresh shuffle any time. It never appears at a multiplayer table — a live game can't be restarted from one phone.</li>
+      <li><b>Table chat (multiplayer):</b> tap <b>💬 Chat</b> at the table — or <b>Table chat</b> on the hand scores between hands — to text everyone at the table, or join <b>live voice chat</b>. Tap <b>End chat — back to the game</b> to return to the game in progress; voice chat keeps running while you play, and the red <b>End voice chat</b> button at the table ends it whenever it's running.</li>
     </ul>
     <button class="big-btn" id="closeHowBtn">Got it</button>
   </div>
@@ -645,6 +678,28 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <button class="big-btn" id="joinAsTeamBtn">🤝 Teammate — sit across from the host</button>
     <button class="big-btn" id="joinAsOppBtn" style="background:var(--btn2);color:#fff">⚔ Opponent — sit beside the host</button>
     <button class="ghost-btn" id="joinAsAnyBtn">Either seat is fine</button>
+  </div>
+</div>
+
+<!-- ============ TABLE CHAT (TEXT + VOICE) ============ -->
+<div class="overlay" id="chatOverlay" role="dialog" aria-modal="true" aria-label="Table chat">
+  <div class="sheet">
+    <h2>💬 Table chat</h2>
+    <p class="small muted">Chat with everyone at this table — by text, or live voice. The game stays right where it is while you talk.</p>
+    <div class="chat-list" id="chatList"><p class="small muted">No messages yet — say hello to the table.</p></div>
+    <p class="fr-status" id="chatStatus" role="status"></p>
+    <div class="chat-compose">
+      <input class="fr-input" id="chatInput" maxlength="300" placeholder="Type a message…" autocomplete="off" aria-label="Chat message">
+      <button type="button" id="chatSendBtn">Send</button>
+    </div>
+    <h3>🎤 Voice chat</h3>
+    <p class="small muted" id="voiceStatus">Join voice chat to talk live with the table. It keeps running while you play — close this sheet and keep talking.</p>
+    <div class="menu-list">
+      <button id="voiceJoinBtn"><span>🎤 Join voice chat</span><span class="hint">uses your microphone</span></button>
+      <button id="voiceEndBtn" style="display:none"><span>🔇 End voice chat</span><span class="hint">for everyone on your phone</span></button>
+    </div>
+    <button class="big-btn" id="chatCloseBtn">End chat — back to the game</button>
+    <p class="small muted" style="text-align:center;margin:9px 0 0">Ending chat only closes this sheet. If you're in voice chat you stay in it while you play — end it any time with the red <b>End voice chat</b> button at the table.</p>
   </div>
 </div>
 
@@ -1374,8 +1429,17 @@ function renderScores(){
 function renderAll(){
   if(!G) return;
   renderScores();
-  /* opponents */
-  var opps=$('opponents'); opps.innerHTML='';
+  /* Seats around the table: your partner sits across from you (the
+     top slot), the opponents sit on your left and right. In a
+     3-player game the two opponents flank you; heads-up, the single
+     opponent sits across. */
+  var seatSlots={ top:$('seatTop'), left:$('seatLeft'), right:$('seatRight') };
+  Object.keys(seatSlots).forEach(function(k){ if(seatSlots[k]) seatSlots[k].innerHTML=''; });
+  var slotFor=function(i){
+    if(G.count===2) return 'top';
+    if(G.count===3) return i===1 ? 'left' : 'right';
+    return i===2 ? 'top' : (i===1 ? 'left' : 'right');
+  };
   for(var i=1;i<G.count;i++){
     (function(i){
       var p=G.players[i];
@@ -1384,11 +1448,18 @@ function renderAll(){
       var away=false;
       if(typeof MP!=='undefined' && MP && MP.active && typeof mpIsViewSeatAway==='function') away=mpIsViewSeatAway(i);
       var div=document.createElement('div');
-      div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'')+(away?' away':'');
+      div.className='opp'+(G.current===i&&(G.phase==='playing'||G.phase==='bidding')?' turn':'')+(away?' away':'')+((G.count===4&&i===2)?' partner':'');
       div.innerHTML='<div class="nm">'+p.name+(G.count===4&&i===2?' 🤝':'')+(away?' ⏳':'')+'</div><div class="backs" aria-hidden="true">'+'🂠'.repeat(Math.min(p.hand.length,13))+'</div><div class="dt">'+p.hand.length+' cards · Bid: '+(p.bid===null?'…':(p.bid===0?'Nil':p.bid))+' · Tricks: '+p.tricks+(G.dealer===i?' · Dealer':'')+(away?'<br>⏳ Away — waiting to reconnect':'')+'</div>';
-      opps.appendChild(div);
+      var slot=seatSlots[slotFor(i)];
+      if(slot) slot.appendChild(div);
     })(i);
   }
+  /* The reshuffle-and-restart button under the table is solo-only —
+     a multiplayer table is never restarted from one phone. The chat
+     button on the hand-result sheet is the opposite: multiplayer only. */
+  var inMp=(typeof MP!=='undefined' && MP && MP.active);
+  var rsb=$('reshuffleBtn'); if(rsb) rsb.style.display=inMp?'none':'';
+  var rcb=$('resultChatBtn'); if(rcb) rcb.style.display=inMp?'':'none';
   /* trick area */
   var ta=$('trickArea'); ta.innerHTML='';
   if(G.trick.length===0){
@@ -1434,7 +1505,7 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','chatOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){ closeAll(); var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none'; $('menuOverlay').classList.add('on'); });
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
@@ -1652,6 +1723,17 @@ $('scoreModeBtn').addEventListener('click',function(){
 });
 setScoringMode('bid', true);
 $('dealBtn').addEventListener('click',function(){ startGame(selectedCount); });
+/* Solo only: reshuffle and start a brand-new game from the bottom of
+   the table. The button is hidden at multiplayer tables (renderAll
+   keeps it that way) and this guard keeps it that way too — a live
+   table is never restarted from one phone. */
+$('reshuffleBtn').addEventListener('click',function(){
+  if(typeof MP!=='undefined' && MP && MP.active) return;
+  if(!G) return;
+  closeAll();
+  startGame(G.count);
+  toast('Reshuffled — brand-new game, scores back to 0 ♠');
+});
 $('readyBidBtn').addEventListener('click',function(){ startBidding(); });
 updateWakeUI();
 renderScores();
@@ -1719,6 +1801,9 @@ var MP={
   pendingInvites:{}, _pendingWatching:false,
   _localInviteSent:false, _textInviteCount:0,
   _joinedNote:null, _joinedTimer:null, _pubUids:null,
+  /* Table chat: the mirrored messages (rooms/{code}/chat), the watch
+     flag, and the unread bookkeeping for the Chat button's badge. */
+  chatMsgs:{}, _chatWatching:false, chatUnread:0, _chatSeenTs:0,
   /* Join queue for a full table: the queue mirror everyone at the table
      reads (for the "N waiting in line" note), the seat hold for the
      first person in line, and this phone's own waiting state when it
@@ -2367,6 +2452,9 @@ function mpIsViewSeatAway(viewIdx){
 }
 function mpSetupPresence(){
   if(!MP.roomRef || MP.mySeat<0 || !window.firebase) return;
+  /* Being seated at a table is also what turns on table chat (text +
+     voice presence) — every route into a seat funnels through here. */
+  mpChatWatch();
   var pref=mpRef('presence/'+MP.mySeat);
   var stamp=function(){ return (window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now(); };
   function writeUp(){
@@ -2952,6 +3040,8 @@ function mpDetach(){
   MP.listeners=[];
   MP._pendingWatching=false;
   MP._queueWatching=false;
+  MP._chatWatching=false;
+  if(typeof VC!=='undefined') VC.sigWatched={};
 }
 
 /* ---- Room codes: 4 letters, claimed so hosts can't collide ----
@@ -3936,6 +4026,12 @@ function mpLeaveTable(){
   /* A player still waiting in the join queue just steps out of line —
      there's no seat or hand to tidy up yet. */
   if(MP.queueing){ mpLeaveQueue(true); return; }
+  /* Leaving the table ends voice chat on this phone and drops the
+     chat mirror (MP.code is still set here, so vcLeave can still
+     reach the room to remove this phone's voice presence). */
+  vcLeave(true);
+  MP.chatMsgs={}; MP.chatUnread=0; MP._chatSeenTs=0;
+  var cb0=$('mpChatBadge'); if(cb0) cb0.textContent='';
   /* A player still waiting on a join request just takes their claim
      back — there's no seat or hand to tidy up yet. */
   if(MP.joinPending){ mpCancelJoinRequest(true); return; }
@@ -3997,6 +4093,9 @@ function mpLeaveTable(){
 function mpStepOut(){
   if(!MP.active || !MP.code) return null;
   var code=MP.code;
+  /* Stepping out ends voice chat on this phone too — the table keeps
+     playing, but a stepped-out phone is not still talking. */
+  vcLeave(true);
   try{
     if(MP.roomRef && MP.mySeat>=0){
       var pref=mpRef('presence/'+MP.mySeat);
@@ -4070,6 +4169,291 @@ function mpReenter(){
       mpRefreshReenter();
     }
   }, 9000);
+}
+
+/* ================= Table chat — text + live voice =================
+   Multiplayer only, for everyone seated at the table. Two room nodes:
+     rooms/{code}/chat/{pushId}   { uid, name, text, ts }
+        Text messages — one node per message, written with push(),
+        read with one listener on the chat node that carries an error
+        callback: if the database rules ever refuse the chat node,
+        the sheet says so out loud instead of failing silently.
+     rooms/{code}/voice/{uid}     { name, sid, ts }
+        Who is in voice chat right now (own node, removed on leave
+        and on disconnect).
+     rooms/{code}/voiceSig/{toUid}/{fromUid}/{pushId}
+        { sid, kind: offer|answer|ice, sdp?, cand?, ts }
+        WebRTC signals. Each phone listens per sender on its own
+        inbox — the same one-node-at-a-time shape the rest of the
+        room uses. The player who joins voice LAST makes the offers
+        to everyone already in, so each pair connects exactly once.
+   Voice keeps running when the chat sheet closes — talk while you
+   play — and for as long as it runs, the table shows a red End
+   voice chat button. Ending chat (the sheet) never ends voice. */
+var VC={ active:false, sid:null, stream:null, pcs:{}, people:{}, sigWatched:{} };
+function mpChatWatch(){
+  if(MP._chatWatching || !MP.roomRef) return;
+  MP._chatWatching=true;
+  if(!MP._chatSeenTs) MP._chatSeenTs=Date.now();
+  mpListen(mpRef('chat'), 'value', function(snap){
+    MP.chatMsgs=snap.val()||{};
+    mpRenderChat();
+  }, function(err){
+    var st=$('chatStatus');
+    if(st) st.textContent='Chat could not load — this table\'s database does not allow the chat room yet, so text chat is unavailable for now. The game itself is unaffected.';
+    if(window.console) console.warn('Spades: table chat read was refused ('+((err && err.code)||'permission denied')+') at rooms/'+MP.code+'/chat.');
+  });
+  mpListen(mpRef('voice'), 'value', function(snap){
+    VC.people=snap.val()||{};
+    vcOnPeople();
+  }, function(err){
+    if(window.console) console.warn('Spades: voice chat presence could not be read ('+((err && err.code)||'permission denied')+').');
+  });
+}
+function mpChatMessages(){
+  return Object.keys(MP.chatMsgs||{}).map(function(k){ return MP.chatMsgs[k]; })
+    .filter(function(m){ return m && m.text; })
+    .sort(function(a,b){ return (a.ts||0)-(b.ts||0); })
+    .slice(-60);
+}
+function mpRenderChat(){
+  var list=$('chatList'); if(!list) return;
+  var msgs=mpChatMessages();
+  list.innerHTML='';
+  if(!msgs.length){
+    list.innerHTML='<p class="small muted">No messages yet — say hello to the table.</p>';
+  }
+  msgs.forEach(function(m){
+    var row=document.createElement('div');
+    row.className='chat-msg'+(m.uid===MP.uid?' me':'');
+    var who=document.createElement('b');
+    who.textContent=(cleanName(m.name||'')||'Player')+(m.uid===MP.uid?' (you)':'');
+    row.appendChild(who);
+    row.appendChild(document.createTextNode(' '+String(m.text).slice(0,300)));
+    if(m.ts){
+      var when=document.createElement('span');
+      when.className='chat-when';
+      when.textContent=' · '+new Date(m.ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+      row.appendChild(when);
+    }
+    list.appendChild(row);
+  });
+  list.scrollTop=list.scrollHeight;
+  /* Unread badge on the table's Chat button: messages from other
+     players that arrived while the sheet was closed. */
+  var open=$('chatOverlay').classList.contains('on');
+  MP.chatUnread = open ? 0 : msgs.filter(function(m){ return m.uid!==MP.uid && (m.ts||0)>(MP._chatSeenTs||0); }).length;
+  var badge=$('mpChatBadge');
+  if(badge) badge.textContent=MP.chatUnread ? (' · '+MP.chatUnread+' new') : '';
+}
+function mpOpenChat(){
+  if(!MP.active || !MP.code){ toast('Table chat is for multiplayer — create or join a table first.'); return; }
+  closeAll();
+  $('chatOverlay').classList.add('on');
+  MP._chatSeenTs=Date.now();
+  MP.chatUnread=0;
+  var badge=$('mpChatBadge'); if(badge) badge.textContent='';
+  mpRenderChat();
+  vcSyncUI();
+  setTimeout(function(){ try{ $('chatInput').focus(); }catch(e){} }, 80);
+}
+function mpSendChat(){
+  var inp=$('chatInput'); if(!inp) return;
+  var text=(inp.value||'').trim().slice(0,300);
+  if(!text) return;
+  if(!MP.roomRef){ toast('You are not at a table right now.'); return; }
+  inp.value='';
+  var st=$('chatStatus'); if(st) st.textContent='';
+  var sent=mpRef('chat').push({ uid:MP.uid, name:mpMyName(), text:text, ts:Date.now() });
+  if(sent && typeof sent.catch==='function'){
+    sent.catch(function(){
+      var s2=$('chatStatus');
+      if(s2) s2.textContent='That message did not go through — check your connection. If it keeps failing, this table\'s database does not allow chat yet.';
+    });
+  }
+}
+/* ---- Voice: join, leave, and the on-table state ---- */
+function vcSyncUI(){
+  var jb=$('voiceJoinBtn'), eb=$('voiceEndBtn'), tb=$('mpVoiceEndBtn'), st=$('voiceStatus');
+  if(jb) jb.style.display=VC.active?'none':'';
+  if(eb) eb.style.display=VC.active?'':'none';
+  if(tb) tb.style.display=VC.active?'':'none';
+  if(st){
+    var others=Object.keys(VC.people||{}).filter(function(u){ return u!==MP.uid; })
+      .map(function(u){ return cleanName((VC.people[u]||{}).name||'')||'Player'; });
+    st.textContent = VC.active
+      ? 'You are in voice chat'+(others.length ? ' with '+others.join(', ') : ' — nobody else has joined yet')+'. It keeps running while you play — close this sheet and keep talking, and end it any time from the table.'
+      : (others.length
+        ? 'In voice chat now: '+others.join(', ')+'. Join to talk live with the table while you play.'
+        : 'Nobody is in voice chat right now. Join and everyone at the table can talk live while you play.');
+  }
+}
+function vcOnPeople(){
+  vcSyncUI();
+  if(!VC.active) return;
+  /* A participant who left voice loses their connection here. New
+     arrivals need no action from this side: the joiner always makes
+     the offers, so their offer is already on its way — I only need
+     to be listening for their signals. */
+  Object.keys(VC.pcs).forEach(function(uid){
+    if(!VC.people[uid]) vcClosePeer(uid);
+  });
+  Object.keys(VC.people).forEach(function(uid){
+    if(uid!==MP.uid) vcWatchSignals(uid);
+  });
+}
+function vcJoin(){
+  if(VC.active || !MP.roomRef) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof RTCPeerConnection==='undefined'){
+    toast('This browser cannot do voice chat — text chat still works.');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio:true }).then(function(stream){
+    if(!MP.roomRef){ stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} }); return; }
+    VC.stream=stream;
+    VC.sid=String(MP.uid).slice(0,6)+'-'+Date.now().toString(36);
+    VC.active=true;
+    var vref=mpRef('voice/'+MP.uid);
+    try{ vref.onDisconnect().remove(); }catch(e){}
+    vref.set({ name:mpMyName(), sid:VC.sid, ts:Date.now() }).catch(function(){
+      var st=$('chatStatus');
+      if(st) st.textContent='Voice chat could not announce you at the table — this table\'s database may not allow voice chat yet.';
+    });
+    vcSyncUI();
+    /* I am the newest arrival: offer to everyone already in voice. */
+    Object.keys(VC.people||{}).forEach(function(uid){
+      if(uid!==MP.uid) vcCall(uid);
+    });
+    toast('You\'re in voice chat — it keeps going while you play 🎤');
+  }).catch(function(){
+    toast('Voice chat needs microphone permission — allow the mic and try again.');
+  });
+}
+function vcLeave(silent){
+  var was=VC.active;
+  VC.active=false;
+  Object.keys(VC.pcs).forEach(function(uid){ vcClosePeer(uid); });
+  if(VC.stream){
+    VC.stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
+    VC.stream=null;
+  }
+  if(MP.roomRef && MP.uid){
+    var vref=mpRef('voice/'+MP.uid);
+    try{ vref.onDisconnect().cancel(); }catch(e){}
+    vref.set(null).catch(function(){});
+    mpRef('voiceSig/'+MP.uid).set(null).catch(function(){});
+  }
+  VC.sid=null;
+  vcSyncUI();
+  if(was && !silent) toast('Voice chat ended — text chat is still there any time.');
+}
+/* ---- Voice: the WebRTC mesh ---- */
+function vcPeer(uid){
+  if(VC.pcs[uid]) return VC.pcs[uid];
+  var pc=null;
+  try{ pc=new RTCPeerConnection({ iceServers:[{ urls:'stun:stun.l.google.com:19302' }] }); }catch(e){ return null; }
+  var rec={ pc:pc, iceQ:[], remoteSet:false, audio:null };
+  VC.pcs[uid]=rec;
+  if(VC.stream) VC.stream.getTracks().forEach(function(t){ try{ pc.addTrack(t, VC.stream); }catch(e){} });
+  pc.onicecandidate=function(ev){
+    if(ev.candidate){
+      vcSignal(uid, { kind:'ice', cand:{ candidate:ev.candidate.candidate, sdpMid:ev.candidate.sdpMid, sdpMLineIndex:ev.candidate.sdpMLineIndex } });
+    }
+  };
+  pc.ontrack=function(ev){
+    if(!rec.audio){
+      rec.audio=document.createElement('audio');
+      rec.audio.autoplay=true;
+      rec.audio.style.display='none';
+      document.body.appendChild(rec.audio);
+    }
+    if(ev.streams && ev.streams[0]) rec.audio.srcObject=ev.streams[0];
+    var pr=rec.audio.play();
+    if(pr && typeof pr.catch==='function') pr.catch(function(){});
+  };
+  pc.onconnectionstatechange=function(){
+    if(pc.connectionState==='failed' || pc.connectionState==='closed') vcClosePeer(uid);
+  };
+  vcWatchSignals(uid);
+  return rec;
+}
+function vcSignal(toUid, msg){
+  if(!MP.roomRef || !VC.sid) return;
+  msg.sid=VC.sid;
+  msg.ts=Date.now();
+  try{ mpRef('voiceSig/'+toUid+'/'+MP.uid).push(msg); }catch(e){}
+}
+function vcCall(uid){
+  var rec=vcPeer(uid); if(!rec) return;
+  var pc=rec.pc;
+  pc.createOffer().then(function(off){
+    return pc.setLocalDescription(off);
+  }).then(function(){
+    vcSignal(uid, { kind:'offer', sdp:pc.localDescription.sdp });
+  }).catch(function(){});
+}
+function vcWatchSignals(fromUid){
+  if(VC.sigWatched[fromUid] || !MP.roomRef) return;
+  VC.sigWatched[fromUid]=true;
+  var ref=mpRef('voiceSig/'+MP.uid+'/'+fromUid);
+  var cb=function(snap){ var m=snap.val(); if(m) vcOnSignal(fromUid, m); };
+  ref.on('child_added', cb, function(err){
+    if(window.console) console.warn('Spades: voice signals from a tablemate could not be read ('+((err && err.code)||'permission denied')+').');
+  });
+  MP.listeners.push({ ref:ref, evt:'child_added', cb:cb });
+}
+function vcOnSignal(fromUid, m){
+  if(!VC.active || !m) return;
+  /* Ignore signals from an earlier voice session of the same player —
+     their inbox keeps old offers, and only the live session counts. */
+  var their=(VC.people||{})[fromUid];
+  if(their && their.sid && m.sid && m.sid!==their.sid) return;
+  var rec=vcPeer(fromUid); if(!rec) return;
+  var pc=rec.pc;
+  if(m.kind==='offer' && m.sdp){
+    if(pc.signalingState==='have-local-offer'){
+      /* Both phones offered at once (joined in the same moment): the
+         smaller uid backs down and answers; the other ignores this. */
+      if(MP.uid>fromUid) return;
+      pc.setLocalDescription({ type:'rollback' }).catch(function(){}).then(function(){ vcAnswer(fromUid, rec, m); });
+      return;
+    }
+    if(pc.signalingState!=='stable') return;
+    vcAnswer(fromUid, rec, m);
+  } else if(m.kind==='answer' && m.sdp){
+    if(pc.signalingState==='have-local-offer'){
+      pc.setRemoteDescription({ type:'answer', sdp:m.sdp }).then(function(){
+        rec.remoteSet=true; vcFlushIce(rec);
+      }).catch(function(){});
+    }
+  } else if(m.kind==='ice' && m.cand){
+    if(rec.remoteSet) pc.addIceCandidate(m.cand).catch(function(){});
+    else rec.iceQ.push(m.cand);
+  }
+}
+function vcAnswer(fromUid, rec, m){
+  var pc=rec.pc;
+  pc.setRemoteDescription({ type:'offer', sdp:m.sdp }).then(function(){
+    rec.remoteSet=true; vcFlushIce(rec);
+    return pc.createAnswer();
+  }).then(function(ans){
+    return pc.setLocalDescription(ans);
+  }).then(function(){
+    vcSignal(fromUid, { kind:'answer', sdp:pc.localDescription.sdp });
+  }).catch(function(){});
+}
+function vcFlushIce(rec){
+  var q=rec.iceQ.splice(0);
+  q.forEach(function(c){ rec.pc.addIceCandidate(c).catch(function(){}); });
+}
+function vcClosePeer(uid){
+  var rec=VC.pcs[uid]; if(!rec) return;
+  delete VC.pcs[uid];
+  try{ rec.pc.close(); }catch(e){}
+  if(rec.audio){
+    try{ rec.audio.srcObject=null; rec.audio.remove(); }catch(e){}
+    rec.audio=null;
+  }
 }
 
 /* ---- Wiring ---- */
@@ -4158,6 +4542,19 @@ $('mpJoinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mp
 $('lobbyStartBtn').addEventListener('click', mpHostStart);
 $('lobbyInviteBtn').addEventListener('click', mpInvite);
 $('mpInviteBtn2').addEventListener('click', mpInvite);
+/* Table chat: opened from the table's Chat button or from the
+   hand-result sheet ("after each hand, go into chat from the table").
+   Closing the sheet ends the chat view only — voice, if running,
+   keeps going while you play, and the table's red End voice chat
+   button (or the one in the sheet) is what ends it. */
+$('mpChatBtn').addEventListener('click', mpOpenChat);
+$('resultChatBtn').addEventListener('click', mpOpenChat);
+$('chatSendBtn').addEventListener('click', mpSendChat);
+$('chatInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpSendChat(); });
+$('chatCloseBtn').addEventListener('click', function(){ closeAll(); });
+$('voiceJoinBtn').addEventListener('click', vcJoin);
+$('voiceEndBtn').addEventListener('click', function(){ vcLeave(false); });
+$('mpVoiceEndBtn').addEventListener('click', function(){ vcLeave(false); });
 $('lobbyLeaveBtn').addEventListener('click', function(){ mpLeaveTable(); backToStart(); toast('You left the table.'); });
 /* Stepping out (host): exit the room but keep it — seat, code and
    hosting all stay put, and the saved session makes re-entering one
