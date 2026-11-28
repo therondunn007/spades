@@ -82,15 +82,16 @@ button{font-family:inherit;cursor:pointer}
 .table-zone{position:relative;margin-top:4px}
 /* Seats are arranged around the table: your partner sits across from
    you (top), the trick area is the centre of the table, and the two
-   opponents sit down at the bottom corners — left and right, right
-   beside your own seat and hand. In a 3-player game the two opponents
-   take those same bottom corners; heads-up, the one opponent sits
-   across. */
-.table-grid{display:grid;gap:8px;grid-template-columns:minmax(88px,1fr) minmax(0,2.1fr) minmax(88px,1fr);grid-template-areas:". top ." ". center ." "left . right";margin-bottom:2px}
+   opponents sit at the left and right, level with the cards in the
+   centre — beside the trick area, not below it — so the table stays
+   compact and your whole hand is visible underneath without
+   scrolling. In a 3-player game the two opponents take those same
+   side seats; heads-up, the one opponent sits across. */
+.table-grid{display:grid;gap:8px;grid-template-columns:minmax(88px,1fr) minmax(0,2.1fr) minmax(88px,1fr);grid-template-areas:". top ." "left center right";margin-bottom:2px}
 .seat-slot{display:flex;justify-content:center;min-width:0}
 .seat-top{grid-area:top}
-.seat-left{grid-area:left;justify-content:flex-end}
-.seat-right{grid-area:right;justify-content:flex-start}
+.seat-left{grid-area:left;justify-content:flex-end;align-items:center}
+.seat-right{grid-area:right;justify-content:flex-start;align-items:center}
 .table-grid .trick-area{grid-area:center}
 .opp{min-width:0;width:100%;max-width:170px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:8px 10px;text-align:center}
 .opp.partner{border-color:rgba(212,175,55,.55)}
@@ -100,11 +101,11 @@ button{font-family:inherit;cursor:pointer}
 .opp .dt{font-family:Verdana,sans-serif;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5}
 .opp .backs{font-size:15px;letter-spacing:2px;color:var(--gold-soft)}
 .trick-area{
-  min-height:172px;border-radius:50%/38px;border:2px solid rgba(212,175,55,.35);
+  min-height:236px;border-radius:50%/38px;border:2px solid rgba(212,175,55,.35);
   background:radial-gradient(90% 100% at 50% 40%, rgba(255,255,255,.07), rgba(0,0,0,.22));
-  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:16px 10px;position:relative;
+  display:block;padding:0;position:relative;
 }
-.trick-empty{font-family:Verdana,sans-serif;font-size:13px;color:var(--muted);text-align:center;padding:0 18px;line-height:1.6}
+.trick-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:Verdana,sans-serif;font-size:13px;color:var(--muted);text-align:center;padding:0 22px;line-height:1.6}
 .msg{min-height:26px;text-align:center;font-size:16.5px;margin:10px 4px 4px;line-height:1.4}
 .msg b{color:var(--gold-soft)}
 .hand-label{display:flex;justify-content:space-between;align-items:baseline;font-family:Verdana,sans-serif;font-size:12.5px;color:var(--muted);margin:8px 2px 6px;flex-wrap:wrap;gap:6px}
@@ -197,9 +198,17 @@ button.card.dim{opacity:.45;cursor:not-allowed}
 .pv-card.pv-plain.red{color:#c62828}
 .pv-card.pv-midnight{background:linear-gradient(160deg,#26314f,#10172a);border:1px solid #54679a;color:#edf0ff;box-shadow:0 2px 5px rgba(0,0,0,.45)}
 .pv-card.pv-midnight.red{color:#ff8296}
-.trick-slot{display:flex;flex-direction:column;align-items:center;gap:4px;animation:deal .25s ease}
-.trick-slot .who{font-family:Verdana,sans-serif;font-size:11px;color:var(--muted)}
-@keyframes deal{from{transform:translateY(-8px) scale(.92);opacity:.3}to{transform:none;opacity:1}}
+.trick-slot{position:absolute;display:flex;flex-direction:column;align-items:center;gap:3px;animation:deal .25s ease;z-index:1}
+.trick-slot .who{font-family:Verdana,sans-serif;font-size:11px;color:var(--muted);white-space:nowrap;max-width:92px;overflow:hidden;text-overflow:ellipsis}
+/* Each played card sits in front of the player who played it — the
+   edge of the table nearest their seat: you at the bottom, your
+   partner (or a heads-up opponent) across at the top, and the two
+   opponents at the left and right. */
+.trick-slot.pos-bottom{bottom:8px;left:50%;transform:translateX(-50%)}
+.trick-slot.pos-top{top:8px;left:50%;transform:translateX(-50%)}
+.trick-slot.pos-left{left:6px;top:50%;transform:translateY(-50%)}
+.trick-slot.pos-right{right:6px;top:50%;transform:translateY(-50%)}
+@keyframes deal{from{opacity:.25}to{opacity:1}}
 @media (prefers-reduced-motion: reduce){.trick-slot{animation:none}.progress i{transition:none}}
 
 /* ---------- Overlays ---------- */
@@ -310,6 +319,18 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
 .chat-compose button{flex:none;background:var(--gold);color:#231a02;border:none;border-radius:10px;padding:9px 16px;font-size:15px;font-weight:bold}
 .chat-compose button:active{transform:scale(.97)}
 #reshuffleBtn{margin-top:12px}
+/* ---------- Open tables browser ---------- */
+.tbl-list{display:grid;gap:10px;margin-top:12px}
+.tbl-card{background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px 13px}
+.tbl-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tbl-code{font-weight:bold;font-size:19px;letter-spacing:.14em;color:var(--gold-soft)}
+.tbl-meta{font-family:Verdana,sans-serif;font-size:12px;color:var(--muted)}
+.tbl-seats{font-family:Verdana,sans-serif;font-size:13.5px;line-height:1.65;margin-top:6px}
+.tbl-seats .open-seat{color:var(--muted)}
+.tbl-open-line{font-family:Verdana,sans-serif;font-size:12.5px;color:var(--gold-soft);margin-top:3px;line-height:1.5}
+.tbl-join{display:block;width:100%;margin-top:10px;padding:11px;border:none;border-radius:11px;background:var(--gold);color:#231a02;font-size:15.5px;font-weight:bold}
+.tbl-join:active{transform:scale(.98)}
+.tbl-join[disabled]{opacity:.5;background:rgba(0,0,0,.3);color:var(--muted)}
 </style>
 </head>
 <body data-deck="classic">
@@ -351,6 +372,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button class="big-btn" id="dealBtn">Shuffle &amp; deal</button>
       <button class="big-btn friends-btn" id="mpBtn">👥 Play with friends — live multiplayer</button>
       <p class="small muted" style="text-align:center;margin:8px 0 0">Create a table, share the 4-letter code, and play live against friends on their own phones. Empty seats are filled by the computer.</p>
+      <button class="ghost-btn" id="tablesBtn1">🪑 Open tables — who's playing right now</button>
+      <p class="small muted" style="text-align:center;margin:8px 0 0">See every table that's open, who's sitting at it, and ask to join — no code needed.</p>
       <button class="ghost-btn" id="friendsBtn1">👥 Friends — add players by game name <span class="fr-badge"></span></button>
       <p class="small muted" style="text-align:center;margin:8px 0 0">Pick a unique game name, add friends by theirs, and invite them to your table right inside the game — no phone number needed.</p>
       <button class="ghost-btn" id="howBtn1">How to play &amp; scoring</button>
@@ -410,6 +433,8 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <button id="deckBtn"><span>🃏 Card deck</span><span class="hint" id="deckHint">Classic</span></button>
       <button id="namesBtn"><span>✎ Player names</span><span class="hint">yours + the table's</span></button>
       <button id="friendsBtn2"><span>👥 Friends</span><span class="hint">add by game name · <span class="fr-badge">invite in the app</span></span></button>
+      <button id="tablesBtn2"><span>🪑 Open tables</span><span class="hint">who's playing · ask to join</span></button>
+      <button id="menuReturnBtn" style="display:none"><span>↩ Return to last room</span><span class="hint" id="menuReturnHint">your seat was kept for you</span></button>
       <button id="mpStepOutBtn2" style="display:none"><span>🚪 Step out of your table</span><span class="hint">table stays open — re-enter any time</span></button>
       <button id="installBtn2"><span>⬇ Install app</span><span class="hint">home-screen icon, works offline</span></button>
       <button id="howBtn2"><span>📖 How to play &amp; scoring</span><span class="hint"></span></button>
@@ -512,9 +537,11 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <li><b>Nil (bid 0):</b> take no tricks for <b>+10</b>; take any trick and it's <b>−10</b>. In partners, a nil is scored on its own, separate from your partner's bid.</li>
       <li>The winner of each trick leads the next one. Dealer rotates every hand.</li>
       <li><b>Pick up where you left off:</b> the game saves itself as you play — close it any time, and when you come back your hand, the bids and the scores are right where you left them.</li>
-      <li><b>Hosting a table:</b> need to step away from a table you're hosting? Tap <b>Step out</b> (in the lobby, or in the Menu mid-game) — the table, its code and your host seat stay exactly as they are, and you re-enter any time from <b>Play with friends → Re-enter my table</b> or by reopening the app. <b>Leave &amp; close the table</b> ends the table for everyone instead. Once every player has been gone for two hours, an empty table is tidied away on its own.</li>
+      <li><b>Hosting a table:</b> need to step away from a table you're hosting? Tap <b>Step out</b> (in the lobby, or in the Menu mid-game) — the table, its code and your host seat stay exactly as they are, and you re-enter any time from <b>Play with friends → Re-enter my table</b>, from <b>Menu → Return to last room</b>, or by reopening the app. <b>Leave &amp; close the table</b> ends the table for everyone instead. Once every player has been gone for two hours, an empty table is tidied away on its own.</li>
+      <li><b>Open tables:</b> tap <b>Open tables</b> on the start screen (or in the Menu) to see every table that's open right now and who's sitting at it, then <b>Ask to join</b> — no code needed. Tables still in their lobby seat you straight away; at a game already in progress the host gets your request and lets you in, and a full table offers you its queue.</li>
+      <li><b>Return to last room:</b> if you were at a table and your seat was kept — you stepped out, or the app closed — <b>Menu → Return to last room</b> takes you straight back to it.</li>
       <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name — everyone at the table sees it — and rename the computer players too. Your bot names stay on your phone in solo play; in a room the host sets the bot names so they match on every screen, and only the host can change them. Names are remembered for next time.</li>
-      <li><b>Seats around the table:</b> in a partners game your partner sits <b>across from you</b>, with an opponent on your <b>left</b> and one on your <b>right</b> — just like a real table. Heads-up, your opponent sits across; with 3 players, the two opponents sit either side of you.</li>
+      <li><b>Seats around the table:</b> in a partners game your partner sits <b>across from you</b>, with an opponent on your <b>left</b> and one on your <b>right</b> — just like a real table. Heads-up, your opponent sits across; with 3 players, the two opponents sit either side of you. When anyone plays a card it lands on the table <b>in front of that player</b> — yours at the bottom edge, your partner's at the top, the opponents' at the sides — and once all the cards are down the full trick stays on the table a few seconds before it's swept away, so you can take in who played what.</li>
       <li><b>Reshuffle (solo only):</b> the <b>🔀 Reshuffle &amp; start a new game</b> button under your hand starts a brand-new game with a fresh shuffle any time. It never appears at a multiplayer table — a live game can't be restarted from one phone.</li>
       <li><b>Table chat (multiplayer):</b> tap <b>💬 Chat</b> at the table — or <b>Table chat</b> on the hand scores between hands — to text everyone at the table, or join <b>live voice chat</b>. Tap <b>End chat — back to the game</b> to return to the game in progress; voice chat keeps running while you play, and the red <b>End voice chat</b> button at the table ends it whenever it's running.</li>
     </ul>
@@ -574,6 +601,17 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <button class="ghost-btn" id="mpInstallBtn">⬇ Install the game — add to home screen</button>
     <p class="small muted" style="text-align:center;margin:2px 0 0">New here? Spades plays right in your browser — installing just adds its ♠ icon to your home screen so it opens like an app.</p>
     <button class="ghost-btn" id="mpCloseBtn">Back</button>
+  </div>
+</div>
+
+<!-- ============ OPEN TABLES BROWSER ============ -->
+<div class="overlay" id="tablesOverlay" role="dialog" aria-modal="true" aria-label="Open tables">
+  <div class="sheet">
+    <h2>🪑 Open tables</h2>
+    <p class="small muted">Every table that's open right now, and who's sitting at it. Tap <b>Ask to join</b> at any table: if it's still in its lobby you sit straight down; if the game is already going, the host sees your request at the table and lets you in — you're dealt in from the next hand. A full table puts you in its queue instead.</p>
+    <div class="tbl-list" id="tablesList"><p class="small muted">Loading tables…</p></div>
+    <p class="fr-status" id="tablesStatus" role="status"></p>
+    <button class="ghost-btn" id="tablesCloseBtn">Done</button>
   </div>
 </div>
 
@@ -1014,7 +1052,8 @@ function loadSavedGame(){
     scheduleAI();
   } else if(G.phase==='trickEnd'){
     var e0=epoch;
-    setTimeout(function(){ if(e0===epoch) finishTrick(); }, 1100);
+    /* A reopened finished trick gets the same long look as a live one. */
+    setTimeout(function(){ if(e0===epoch) finishTrick(); }, 3000);
   }
   saveGame();
   toast('Welcome back — your game picked up right where you left it ♠');
@@ -1339,7 +1378,10 @@ function playCard(pIdx, card){
     setMsg('<b>'+escHtml(G.players[wNow].name)+'</b> takes trick '+G.trickNo+'.');
     renderAll();
     var myEpoch=epoch;
-    setTimeout(function(){ if(myEpoch===epoch) finishTrick(); }, 1250);
+    /* Hold the completed trick on the table — all four cards face-up
+       in front of their players, winner highlighted — long enough for
+       everyone to take it in before the cards are swept away. */
+    setTimeout(function(){ if(myEpoch===epoch) finishTrick(); }, 3000);
   } else {
     G.current=(pIdx+1)%G.count;
     renderAll(); scheduleAI();
@@ -1440,10 +1482,10 @@ function renderAll(){
   if(!G) return;
   renderScores();
   /* Seats around the table: your partner sits across from you (the
-     top slot), the opponents sit at the bottom-left and bottom-right
-     corners, beside your own seat. In a 3-player game the two
-     opponents take those same corners; heads-up, the single opponent
-     sits across. */
+     top slot), the opponents sit at the left and right, level with
+     the cards in the centre of the table. In a 3-player game the two
+     opponents take those same side slots; heads-up, the single
+     opponent sits across. */
   var seatSlots={ top:$('seatTop'), left:$('seatLeft'), right:$('seatRight') };
   Object.keys(seatSlots).forEach(function(k){ if(seatSlots[k]) seatSlots[k].innerHTML=''; });
   var slotFor=function(i){
@@ -1471,14 +1513,24 @@ function renderAll(){
   var inMp=(typeof MP!=='undefined' && MP && MP.active);
   var rsb=$('reshuffleBtn'); if(rsb) rsb.style.display=inMp?'none':'';
   var rcb=$('resultChatBtn'); if(rcb) rcb.style.display=inMp?'':'none';
-  /* trick area */
+  /* trick area — each card sits in front of the player who played it:
+     you at the bottom edge, the player across from you at the top,
+     and the side players at the left and right edges. The mapping
+     mirrors the seats around the table (see slotFor above), and view
+     index 0 is always the player holding this phone. */
   var ta=$('trickArea'); ta.innerHTML='';
   if(G.trick.length===0){
     ta.innerHTML='<div class="trick-empty">'+(G.phase==='review'?'Your cards are dealt — look them over below, then tap Ready when you\'re set to bid.':(G.phase==='bidding'?'Bidding…':'Waiting for the lead card. Spades can lead — no need to break them first.'))+'</div>';
   } else {
     var winPos=trickWinnerIdx(G.trick);
+    var trickPosFor=function(pIdx){
+      if(G.count===2) return pIdx===0?'bottom':'top';
+      if(G.count===3) return pIdx===0?'bottom':(pIdx===1?'left':'right');
+      return pIdx===0?'bottom':(pIdx===2?'top':(pIdx===1?'left':'right'));
+    };
     G.trick.forEach(function(t,i){
-      var slot=document.createElement('div'); slot.className='trick-slot';
+      var slot=document.createElement('div'); slot.className='trick-slot pos-'+trickPosFor(t.p);
+      if(G.phase==='trickEnd'&&i===winPos) slot.style.zIndex='3';
       slot.appendChild(cardEl(t.card,{mini:true, winning: G.phase==='trickEnd'&&i===winPos}));
       var who=document.createElement('div'); who.className='who'; who.textContent=G.players[t.p].name;
       slot.appendChild(who); ta.appendChild(slot);
@@ -1516,8 +1568,23 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','chatOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
-$('menuBtn').addEventListener('click',function(){ closeAll(); var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none'; $('menuOverlay').classList.add('on'); });
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','chatOverlay','tablesOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+$('menuBtn').addEventListener('click',function(){
+  closeAll();
+  var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none';
+  /* Return to last room: offered whenever this phone holds a saved
+     table session and isn't sitting at a table right now — the seat
+     (and the hosting, if it never handed over) is still waiting. */
+  var rb=$('menuReturnBtn');
+  if(rb){
+    var sess=null;
+    if(typeof MP!=='undefined' && MP && !MP.active && typeof mpLoadSession==='function'){ try{ sess=mpLoadSession(); }catch(e){} }
+    rb.style.display=(sess && sess.code)?'':'none';
+    var hint=$('menuReturnHint');
+    if(hint && sess) hint.textContent='table '+sess.code+' · your seat was kept for you';
+  }
+  $('menuOverlay').classList.add('on');
+});
 $('closeMenuBtn').addEventListener('click',closeAll);
 $('restartBtn').addEventListener('click',function(){
   var count=G?G.count:selectedCount;
@@ -2485,6 +2552,9 @@ function mpSetupPresence(){
   MP._presenceTimer=setInterval(function(){
     if(!MP.active) return;
     pref.update({ connected:true, lastSeen:stamp() }).catch(function(){});
+    /* The host's heartbeat also keeps the table's open-tables
+       listing fresh (throttled inside otPublish). */
+    otPublish();
   }, 15000);
   if(!MP._uiTimer){
     MP._uiTimer=setInterval(function(){
@@ -2694,6 +2764,9 @@ function mpBecomeHost(backup){
      unrelated (solo) game that happens to be on this phone. */
   if(!rebuilt) return false;
   MP.isHost=true;
+  /* Hosting handed over: the open-tables listing now names this
+     phone as the table's host. */
+  otPublish(true);
   MP._allReady=false;
   closeAll();
   $('startScreen').classList.remove('on');
@@ -3654,9 +3727,13 @@ function mpWatchLobby(){
     mpQueueMaybeOffer();
     /* Mid-game, a players entry the game doesn't know is a join request. */
     mpHostCheckJoinRequests();
+    /* A seat filled or emptied: keep this table's open-tables
+       listing honest about who's sitting at it (host only writes). */
+    otPublish();
   });
   mpListen(mpRef('meta/status'), 'value', function(snap){
     if(snap.val()==='playing' && MP.meta) MP.meta.status='playing';
+    if(MP.isHost) otPublish(true);
     if(snap.val()==='playing' && !MP.isHost && $('lobbyOverlay').classList.contains('on')){
       /* Host started: the public-state watcher takes the guest to the table. */
       mpSetLobbyStatus('The host started the game — dealing your cards…');
@@ -3681,6 +3758,7 @@ function mpHostStart(){
   if(!MP.isHost || !MP.roomRef) return;
   mpRef('meta/status').set('playing');
   if(MP.meta) MP.meta.status='playing';
+  otPublish(true);
   $('lobbyOverlay').classList.remove('on');
   startGame(MP.meta.count);
   mpNotifyGameStarted();
@@ -3902,7 +3980,7 @@ function mpWatchGuestGame(){
    update move past a finished trick until that trick — taken live, or
    rebuilt from the host's kept copy (pub.lastTrick) — has sat in the
    centre, winner highlighted, for a minimum moment. */
-var MP_TRICK_HOLD_MS=1500;
+var MP_TRICK_HOLD_MS=3000;
 function mpApplyPublic(pub){
   if(!MP.active || MP.isHost || !pub) return;
   var now=Date.now();
@@ -4046,6 +4124,11 @@ function mpLeaveTable(){
   /* A player still waiting on a join request just takes their claim
      back — there's no seat or hand to tidy up yet. */
   if(MP.joinPending){ mpCancelJoinRequest(true); return; }
+  /* The host leaving for good takes the table off the open-tables
+     list, so nobody asks to join a table that has closed. (Stepping
+     out is the other exit and deliberately keeps the listing — the
+     table stays open.) */
+  if(MP.isHost && MP.code && MP.db){ try{ MP.db.ref('openTables/'+MP.code).set(null).catch(function(){}); }catch(e){} }
   /* Leaving the table retires this phone's text/share invite line for
      good — the persisted flag goes with it (MP.code is still set here). */
   mpClearTextInviteFlag();
@@ -4180,6 +4263,149 @@ function mpReenter(){
       mpRefreshReenter();
     }
   }, 9000);
+}
+
+/* ================= Open tables browser =================
+   A public directory of the tables that are open right now, so a
+   player can find a game without being handed a code first:
+     openTables/{code} -> { hostUid, hostName, hostSeat, count,
+                            scoring, status, seats:{seat:name},
+                            taken, updatedAt }
+   The HOST's phone is the only writer of its table's entry — the
+   same one-writer shape as the rest of the room. It publishes when
+   the table is created, again whenever a seat fills or empties (the
+   lobby watcher below), when the game starts, when hosting hands
+   over, and on a slow heartbeat while the host is present, so the
+   entry's updatedAt stays honest. Leaving the table for good removes
+   the entry; stepping out keeps it, because the table stays open.
+   Readers treat an entry older than two hours as gone — the same
+   horizon after which the empty-room sweep tidies the room itself.
+   Asking to join routes through the ordinary code join, so the
+   teammate/opponent pick, the host's let-in decision for a game in
+   progress, and the queue for a full table all behave exactly as
+   they do for a typed code. */
+var OT={ watching:false, tables:{}, cb:null };
+var OT_FRESH_MS=2*60*60*1000;
+function otPublish(force){
+  if(!MP.isHost || !MP.active || !MP.code || !MP.db) return;
+  var now=Date.now();
+  if(!force && MP._otLastPub && (now-MP._otLastPub)<30000) return;
+  MP._otLastPub=now;
+  var count=(MP.meta && MP.meta.count) || selectedCount;
+  var seats={}, taken=0;
+  for(var s=0;s<count;s++){
+    var info=MP.seats ? MP.seats[String(s)] : null;
+    if(info && info.uid){ seats[String(s)]=cleanName(info.name||'')||'Player'; taken++; }
+  }
+  var entry={
+    hostUid:MP.uid, hostName:cleanName(mpMyName()||'')||'Player', hostSeat:MP.mySeat,
+    count:count, scoring:(MP.meta && MP.meta.scoringMode) || selectedScoring,
+    status:(MP.meta && MP.meta.status) || 'lobby',
+    seats:seats, taken:taken, updatedAt:now
+  };
+  MP.db.ref('openTables/'+MP.code).set(entry).catch(function(err){
+    if(!MP._otWarned){
+      MP._otWarned=true;
+      if(window.console) console.warn('Spades: this table could not be listed in Open tables ('+((err && err.code)||'permission denied')+') at openTables/'+MP.code+' — other players will not see it there.');
+    }
+  });
+}
+function otOpen(){
+  closeAll();
+  $('tablesOverlay').classList.add('on');
+  var st=$('tablesStatus'); if(st) st.textContent='';
+  otRender();
+  mpConnect().then(function(){
+    if(OT.watching){ otRender(); return; }
+    OT.watching=true;
+    OT.cb=function(snap){ OT.tables=snap.val()||{}; otRender(); };
+    MP.db.ref('openTables').on('value', OT.cb, function(err){
+      OT.watching=false;
+      var s2=$('tablesStatus');
+      if(s2) s2.textContent='The open-tables list could not load — the game database does not allow the list yet, so tables cannot be browsed here for now. You can still join any table with its 4-letter code from Play with friends.';
+      if(window.console) console.warn('Spades: the open-tables list could not be read ('+((err && err.code)||'permission denied')+') at openTables.');
+    });
+  }).catch(function(){
+    var s3=$('tablesStatus');
+    if(s3) s3.textContent='Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.';
+  });
+}
+function otClose(){
+  if(OT.watching && typeof MP!=='undefined' && MP && MP.db && OT.cb){
+    try{ MP.db.ref('openTables').off('value', OT.cb); }catch(e){}
+  }
+  OT.watching=false; OT.cb=null;
+  closeAll();
+}
+function otRender(){
+  var box=$('tablesList'); if(!box) return;
+  var now=Date.now();
+  var codes=Object.keys(OT.tables||{}).filter(function(code){
+    var t=OT.tables[code];
+    return t && t.status!=='closed' && (now-(t.updatedAt||0))<OT_FRESH_MS;
+  });
+  codes.sort(function(a,b){ return (OT.tables[b].updatedAt||0)-(OT.tables[a].updatedAt||0); });
+  box.innerHTML='';
+  if(!codes.length){
+    box.innerHTML='<p class="small muted">No open tables right now. Start one from <b>Play with friends</b> and it will show up here for everyone.</p>';
+    return;
+  }
+  codes.forEach(function(code){ box.appendChild(otRow(code, OT.tables[code])); });
+}
+function otRow(code, t){
+  var count=t.count||4;
+  var card=document.createElement('div'); card.className='tbl-card';
+  var head=document.createElement('div'); head.className='tbl-head';
+  var codeEl=document.createElement('span'); codeEl.className='tbl-code'; codeEl.textContent='♠ '+code;
+  var meta=document.createElement('span'); meta.className='tbl-meta';
+  var sizeName = count===4 ? 'Partners' : (count===2 ? 'Heads-up' : 'Solo seats');
+  meta.textContent=sizeName+' · '+(SCORING_NAMES[t.scoring]||'Bid = points')+' · '+(t.status==='playing' ? 'Game in progress' : 'In the lobby');
+  head.appendChild(codeEl); head.appendChild(meta); card.appendChild(head);
+  /* Who's sitting at the table — names arrive from other phones via
+     the database, so they are rendered as text, never as markup. */
+  var seats=document.createElement('div'); seats.className='tbl-seats';
+  for(var s=0;s<count;s++){
+    if(s>0) seats.appendChild(document.createTextNode(' · '));
+    var nm=(t.seats && t.seats[String(s)]) ? String(t.seats[String(s)]) : null;
+    var span=document.createElement('span');
+    if(nm){
+      span.textContent='Seat '+(s+1)+': '+nm+((typeof t.hostSeat==='number' && t.hostSeat===s)?' (host)':'');
+    } else {
+      span.className='open-seat';
+      span.textContent='Seat '+(s+1)+': open — computer for now';
+    }
+    seats.appendChild(span);
+  }
+  card.appendChild(seats);
+  var taken=t.taken||0, open=count-taken;
+  var line=document.createElement('div'); line.className='tbl-open-line';
+  line.textContent = open>0
+    ? (taken+' of '+count+' seats taken — '+open+(open===1?' seat':' seats')+' open.')
+    : 'Every seat has a player — join the queue and you are first in line when one opens.';
+  card.appendChild(line);
+  var btn=document.createElement('button'); btn.type='button'; btn.className='tbl-join';
+  var mine=(typeof MP!=='undefined' && MP && MP.active && MP.code===code);
+  if(mine){
+    btn.textContent='This is your table'; btn.disabled=true;
+  } else if(typeof MP!=='undefined' && MP && MP.active){
+    btn.textContent='You are at another table — leave it to join this one'; btn.disabled=true;
+  } else {
+    btn.textContent = open>0 ? 'Ask to join' : 'Table full — join the queue';
+    btn.addEventListener('click', function(){ otAskJoin(code); });
+  }
+  card.appendChild(btn);
+  return card;
+}
+function otAskJoin(code){
+  otClose();
+  /* Route through the standard Play-with-friends join so the status
+     line, the teammate/opponent pick, the host's decision and the
+     queue all live in their usual place. */
+  $('mpJoinInput').value=code;
+  mpSetStatus('');
+  mpRefreshReenter();
+  $('mpOverlay').classList.add('on');
+  mpJoin(code);
 }
 
 /* ================= Table chat — text + live voice =================
@@ -4582,6 +4808,20 @@ $('mpStepOutBtn2').addEventListener('click', function(){
   toast('You stepped out — table '+(code||'')+' stays open and the game carries on. Re-enter any time from Play with friends ♠');
 });
 $('mpReenterBtn').addEventListener('click', mpReenter);
+/* Return to last room, from the Menu: same one-tap re-entry as the
+   Play-with-friends sheet's button, without the trip through it —
+   the sheet still opens underneath so the join's status line (and
+   the teammate/opponent pick, if one is needed) has its usual home. */
+$('menuReturnBtn').addEventListener('click', function(){
+  closeAll();
+  mpRefreshReenter();
+  $('mpOverlay').classList.add('on');
+  mpReenter();
+});
+/* Open tables browser: from the start screen and from the Menu. */
+$('tablesBtn1').addEventListener('click', otOpen);
+$('tablesBtn2').addEventListener('click', otOpen);
+$('tablesCloseBtn').addEventListener('click', otClose);
 /* Sending a text invite from the table lights the sender-only waiting
    line until the next player sits down (see mpRenderTableNotes). */
 $('lobbySmsBtn').addEventListener('click', function(){ mpMarkTextInviteSent(); });
