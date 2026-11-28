@@ -427,6 +427,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
     <h2>Menu</h2>
     <p class="small muted" id="menuState">No game in progress.</p>
     <div class="menu-list">
+      <button id="menuNextDealBtn" class="primary" style="display:none"><span id="menuNextDealLabel">🃏 Next deal</span><span class="hint" id="menuNextDealHint">deal the next hand — scores stay as they are</span></button>
       <button id="restartBtn" class="primary"><span>↻ Restart game</span><span class="hint">fresh scores, fresh shuffle</span></button>
       <button id="scoreModeBtn"><span>🏆 Scoring</span><span class="hint" id="scoreModeHint">Bid = points · first to 35</span></button>
       <button id="setupBtn"><span>♠ New table setup</span><span class="hint">change player count</span></button>
@@ -543,7 +544,7 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
       <li><b>Your name on the table:</b> Menu → <b>Player names</b> lets you play under your own name — everyone at the table sees it — and rename the computer players too. Your bot names stay on your phone in solo play; in a room the host sets the bot names so they match on every screen, and only the host can change them. Names are remembered for next time.</li>
       <li><b>Seats around the table:</b> in a partners game your partner sits <b>across from you</b>, with an opponent on your <b>left</b> and one on your <b>right</b> — just like a real table. Heads-up, your opponent sits across; with 3 players, the two opponents sit either side of you. When anyone plays a card it lands on the table <b>in front of that player</b> — yours at the bottom edge, your partner's at the top, the opponents' at the sides — and once all the cards are down the full trick stays on the table a few seconds before it's swept away, so you can take in who played what.</li>
       <li><b>Reshuffle (solo only):</b> the <b>🔀 Reshuffle &amp; start a new game</b> button under your hand starts a brand-new game with a fresh shuffle any time. It never appears at a multiplayer table — a live game can't be restarted from one phone.</li>
-      <li><b>Table chat (multiplayer):</b> tap <b>💬 Chat</b> at the table — or <b>Table chat</b> on the hand scores between hands — to text everyone at the table, or join <b>live voice chat</b>. Tap <b>End chat — back to the game</b> to return to the game in progress; voice chat keeps running while you play, and the red <b>End voice chat</b> button at the table ends it whenever it's running.</li>
+      <li><b>Table chat (multiplayer):</b> tap <b>💬 Chat</b> at the table — or <b>Table chat</b> on the hand scores between hands — to text everyone at the table, or join <b>live voice chat</b>. Tap <b>End chat — back to the game</b> to return to the game in progress; voice chat keeps running while you play, and the red <b>End voice chat</b> button at the table ends it whenever it's running. Between hands, ending chat brings the <b>hand scores</b> back — opening chat never loses them — and while a scored hand is waiting, the <b>Menu</b> also offers <b>Next deal</b>, so the next hand can always be dealt without restarting and wiping the scores.</li>
     </ul>
     <button class="big-btn" id="closeHowBtn">Got it</button>
   </div>
@@ -1197,6 +1198,7 @@ function newDeal(){
   for(var i=0;i<n;i++) G.players[i%G.count].hand.push(deck[i]);
   G.players.forEach(function(p){ sortHand(p.hand); });
   G.trick=[]; G.trickNo=1; G.phase='review';
+  G.dealId=makeDealId(); /* this deal's Ready taps must name this deal — see makeDealId */
   G.bidQueue=[];
   var start=(G.dealer+1)%G.count;
   for(var k=0;k<G.count;k++) G.bidQueue.push((start+k)%G.count);
@@ -1214,6 +1216,22 @@ function newDeal(){
 function sortHand(h){
   var order={c:0,d:1,h:2,s:3};
   h.sort(function(a,b){ return order[a.suit]-order[b.suit] || b.rank-a.rank; });
+}
+/* Every deal gets a one-off ID that no other deal — in this game, in a
+   restarted game, or in an earlier game at a reused room code — can
+   ever share. Multiplayer Ready taps are written and checked against
+   this ID, never against the hand number alone: hand numbers repeat
+   (every new game starts again at Hand 1), so a Ready tap left in the
+   room by a previous game used to match the new game's first hand and
+   open bidding by itself, before anyone had looked at their cards. */
+var dealSeq=0;
+function makeDealId(){
+  dealSeq++;
+  /* A number, like the hand numbers Ready taps used to carry, but one
+     that can never repeat: the current time in milliseconds, shifted
+     to make room for a per-page counter (kept well inside the exact-
+     integer range, so it survives the trip through the room intact). */
+  return Date.now()*1000 + (dealSeq%1000);
 }
 function handSummaryText(){
   if(!G||!G.players[0]) return '';
@@ -1626,8 +1644,40 @@ function renderAll(){
 
 /* ================= Overlays & menu wiring ================= */
 function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','joinNameOverlay','chatOverlay','tablesOverlay','inviteOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+/* A scored hand that has not been dealt on from yet (phase 'scoring')
+   must always keep a way forward. Sheets opened over the hand-result
+   sheet — table chat from its "Table chat" button, the Menu, How to
+   play — all open with closeAll(), which hid the result sheet, and
+   their own close buttons only hid themselves, so the result sheet
+   (and its Next deal button) was lost: the table sat on 0 cards and
+   "Waiting for the lead card" with no bidding and no way on except
+   Restart, which wipes the scores. This puts the sheet back whenever
+   a sheet that was covering it closes while the hand is still scored
+   and waiting — the check is the phase itself, not how the sheet was
+   reached, so it also recovers a table that was already stranded.
+   Hosts whose sheet content is somehow missing get it rebuilt by
+   mpShowHostResult (multiplayer script) instead. */
+function reshowResultIfScoring(){
+  if(!G || G.phase!=='scoring') return;
+  if($('resultBody').innerHTML){ $('resultOverlay').classList.add('on'); return; }
+  if(typeof MP!=='undefined' && MP && MP.active && MP.isHost && typeof mpShowHostResult==='function') mpShowHostResult();
+}
 $('menuBtn').addEventListener('click',function(){
   closeAll();
+  /* Next deal: while a scored hand is waiting, the Menu itself offers
+     the next hand — scores untouched — so a player who lost the
+     result sheet (chat, a stray sheet, anything) is never forced
+     into Restart. Mirrors the result sheet's own button, including
+     the game-over wording and the guest case below. */
+  var nd=$('menuNextDealBtn');
+  if(nd){
+    var waiting=!!(G && G.phase==='scoring');
+    nd.style.display=waiting?'':'none';
+    if(waiting){
+      var ndl=$('menuNextDealLabel'); if(ndl) ndl.textContent=G.over?'🏆 Play again — fresh game':'🃏 Next deal';
+      var ndh=$('menuNextDealHint'); if(ndh) ndh.textContent=G.over?'the game is over — start a fresh one':'deal the next hand — scores stay as they are';
+    }
+  }
   var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none';
   /* Return to last room: offered whenever this phone holds a saved
      table session and isn't sitting at a table right now — the seat
@@ -1642,7 +1692,17 @@ $('menuBtn').addEventListener('click',function(){
   }
   $('menuOverlay').classList.add('on');
 });
-$('closeMenuBtn').addEventListener('click',closeAll);
+$('closeMenuBtn').addEventListener('click',function(){ closeAll(); reshowResultIfScoring(); });
+$('menuNextDealBtn').addEventListener('click',function(){
+  /* Exactly the result sheet's Next deal button, from the Menu:
+     guests wait for the host, a finished game starts fresh, and
+     otherwise the next hand is dealt with the scores kept. */
+  if(typeof MP!=='undefined' && MP && MP.active && !MP.isHost){ toast('Waiting for the host to deal the next hand…'); return; }
+  closeAll();
+  if(!G || G.phase!=='scoring') return;
+  if(G.over){ startGame(G.count); return; }
+  newDeal();
+});
 $('restartBtn').addEventListener('click',function(){
   var count=G?G.count:selectedCount;
   closeAll(); startGame(count);
@@ -1661,11 +1721,12 @@ $('resultBtn').addEventListener('click',function(){
 });
 $('howBtn1').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
 $('howBtn2').addEventListener('click',function(){ closeAll(); $('howOverlay').classList.add('on'); });
-$('closeHowBtn').addEventListener('click',closeAll);
+$('closeHowBtn').addEventListener('click',function(){ closeAll(); reshowResultIfScoring(); });
 $('installBtn1').addEventListener('click',onInstallTap);
 $('installBtn2').addEventListener('click',onInstallTap);
 $('closeInstallBtn').addEventListener('click',function(){
   closeAll();
+  reshowResultIfScoring();
   /* If the install sheet was opened mid-join, return to that screen. */
   if(typeof mpRestoreJoinUi==='function') mpRestoreJoinUi();
 });
@@ -1682,7 +1743,7 @@ function setDeck(name, silent){
   if(!silent){ beep(700,0.06,0.05); toast('Deck changed — '+DECK_NAMES[name]+' ♠'); }
 }
 $('deckBtn').addEventListener('click',function(){ closeAll(); $('deckOverlay').classList.add('on'); });
-$('closeDeckBtn').addEventListener('click',closeAll);
+$('closeDeckBtn').addEventListener('click',function(){ closeAll(); reshowResultIfScoring(); });
 /* ================= Player names ================= */
 function nameField(label, value, placeholder, id){
   var wrap=document.createElement('div'); wrap.className='name-field';
@@ -1767,7 +1828,7 @@ function openNames(){
 }
 $('namesBtn').addEventListener('click', openNames);
 $('namesBtn1').addEventListener('click', openNames);
-$('closeNamesBtn').addEventListener('click', closeAll);
+$('closeNamesBtn').addEventListener('click', function(){ closeAll(); reshowResultIfScoring(); });
 $('saveNamesBtn').addEventListener('click', function(){
   var room=namesRoomState();
   customNames.you=cleanName($('nm-you').value);
@@ -1827,7 +1888,7 @@ document.querySelectorAll('.deck-option').forEach(function(btn){
 });
 setDeck('classic', true);
 document.querySelectorAll('.overlay').forEach(function(ov){
-  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay' && ov.id!=='joinAsOverlay' && ov.id!=='joinNameOverlay' && ov.id!=='notifyOverlay') ov.classList.remove('on'); });
+  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay' && ov.id!=='joinAsOverlay' && ov.id!=='joinNameOverlay' && ov.id!=='notifyOverlay'){ ov.classList.remove('on'); /* Dismissing a sheet that was covering the hand scores (chat, menu, …) by tapping outside it returns to those scores while a scored hand waits — never to the stranded empty table. */ if(ov.id==='chatOverlay'||ov.id==='menuOverlay'||ov.id==='howOverlay'||ov.id==='deckOverlay'||ov.id==='namesOverlay') reshowResultIfScoring(); } });
 });
 /* player count selector */
 document.querySelectorAll('#countSeg button').forEach(function(btn){
@@ -3056,7 +3117,7 @@ function mpSerializeBackup(){
   return {
     count:G.count, scoringMode:G.scoringMode, phase:G.phase,
     dealer:mpViewToAbs(G.dealer), current:mpViewToAbs(G.current), leader:mpViewToAbs(G.leader),
-    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
+    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, dealId:G.dealId||null, over:!!G.over,
     teamScores:teamScores, absPlayers:absPlayers, replaced:MP.replaced||{},
     trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; })
   };
@@ -3096,6 +3157,11 @@ function mpRebuildFromBackup(backup){
     phase:backup.phase, trick:(backup.trick||[]).map(function(t){ return { p:toView(t.p), card:t.card }; }),
     current:toView(backup.current), leader:toView(backup.leader),
     trickNo:backup.trickNo, cardsPer:backup.cardsPer, handNo:backup.handNo,
+    /* A rebuilt table in review keeps the deal's ID, so Ready taps
+       already sent for this deal still count — and a backup from
+       before deal IDs existed gets a fresh one, so no stale tap can
+       match it and guests simply tap Ready again for this deal. */
+    dealId: backup.dealId || (backup.phase==='review' ? makeDealId() : null),
     over:!!backup.over, scoringMode:backup.scoringMode, bidQueue:[]
   };
   /* If bidding was mid-flight, rebuild the remaining bid queue so play
@@ -4118,7 +4184,7 @@ function mpPublicState(){
   var pub={
     count:G.count, scoringMode:G.scoringMode, phase:G.phase,
     dealer:mpViewToAbs(G.dealer), current:mpViewToAbs(G.current), leader:mpViewToAbs(G.leader),
-    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
+    trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, dealId:G.dealId||null, over:!!G.over,
     teamScores:teamScores, players:players, hostUid:MP.uid,
     trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; }),
     msg:$('msg').innerHTML,
@@ -4182,7 +4248,18 @@ function mpHostSync(){
 }
 function mpResetReady(){
   MP.readyMap={}; MP._allReady=false; MP._readySent=false;
-  if(MP.roomRef) mpRef('ready').set(null).catch(function(){});
+  if(MP.roomRef){
+    /* Clear each seat's Ready tap on its own node — the way the
+       database rules are written (per seat, like presence, intents
+       and replacements). Clearing the whole ready node in one write
+       is not granted, and when that write is rejected the database
+       hands the OLD taps back to the seat listeners, which read as
+       "everyone is ready" and started bidding on its own. Per-seat
+       clears land; and because taps now name this deal's unique ID
+       (see makeDealId), even a tap that somehow survives can never
+       be mistaken for one belonging to this deal. */
+    for(var s=0;s<4;s++) mpRef('ready/'+s).set(null).catch(function(){});
+  }
   mpListenReady();
 }
 var mpReadyListening=false;
@@ -4215,8 +4292,13 @@ function mpCheckReady(){
   /* The ready map is keyed by absolute seat; human seats here are view
      indices, so translate before checking. Away seats still count — they
      unblock when they reconnect, or when the host replaces them with AI
-     (mpReplaceWithAI re-runs this check). */
-  var all=seats.every(function(s){ return MP.readyMap[String(mpViewToAbs(s))]===G.handNo; });
+     (mpReplaceWithAI re-runs this check). A seat only counts as ready
+     when its tap names THIS deal's unique ID — a tap left over from an
+     earlier hand or an earlier game (which may share this hand number)
+     never opens bidding. Tables rebuilt from a backup with no deal ID
+     fall back to the hand number, as before. */
+  var want=(G.dealId || G.handNo);
+  var all=seats.every(function(s){ return MP.readyMap[String(mpViewToAbs(s))]===want; });
   if(all){
     MP._allReady=true;
     startBidding();
@@ -4224,8 +4306,9 @@ function mpCheckReady(){
 }
 function mpHostReady(){
   if(!MP.roomRef || !G) return;
-  MP.readyMap[String(MP.mySeat)]=G.handNo;
-  var w={}; w[String(MP.mySeat)]=G.handNo;
+  var key=(G.dealId || G.handNo); /* the tap names this deal, not just this hand number */
+  MP.readyMap[String(MP.mySeat)]=key;
+  var w={}; w[String(MP.mySeat)]=key;
   mpRef('ready').update(w).catch(function(){});
   mpListenReady();
   mpCheckReady();
@@ -4282,7 +4365,7 @@ function mpSendIntent(intent){
 function mpGuestReady(){
   if(MP._readySent || !MP.roomRef || !G) return;
   MP._readySent=true;
-  var w={}; w[String(MP.mySeat)]=G.handNo;
+  var w={}; w[String(MP.mySeat)]=(G.dealId || G.handNo); /* the tap names this deal, not just this hand number */
   mpRef('ready').update(w).catch(function(){});
   var rb=$('reviewBar'); if(rb) rb.hidden=true;
   setMsg('You\'re ready — <b>waiting for the rest of the table</b> to look over their cards…');
@@ -4423,10 +4506,15 @@ function mpApplyPublicNow(pub){
     count:count, players:players, dealer:rot(pub.dealer), teamScores:teamScores,
     phase:pub.phase, trick:(pub.trick||[]).map(function(t){ return { p:rot(t.p), card:t.card }; }),
     current:rot(pub.current), leader:rot(pub.leader), trickNo:pub.trickNo,
-    cardsPer:pub.cardsPer, handNo:pub.handNo, over:!!pub.over, scoringMode:pub.scoringMode,
+    cardsPer:pub.cardsPer, handNo:pub.handNo, dealId:pub.dealId||null, over:!!pub.over, scoringMode:pub.scoringMode,
     bidQueue:[]
   };
   if(pub.phase!=='review') MP._readySent=false;
+  /* A new deal is a new Ready gate, even when the table goes straight
+     back into review (a restarted game): if this phone's Ready tap from
+     the deal before still counted as sent, tapping Ready for THIS deal
+     would do nothing and the review pause would be gone for this guest. */
+  if(pub.dealId && MP._readyDealId!==pub.dealId){ MP._readyDealId=pub.dealId; MP._readySent=false; }
   setGameActive(true);
   $('startScreen').classList.remove('on');
   $('gameScreen').classList.add('on');
@@ -4702,6 +4790,7 @@ function otClose(){
   }
   OT.watching=false; OT.cb=null;
   closeAll();
+  reshowResultIfScoring();
 }
 function otRender(){
   var box=$('tablesList'); if(!box) return;
@@ -5159,6 +5248,7 @@ $('mpCloseBtn').addEventListener('click', function(){
   if(MP.queueing) mpLeaveQueue(true);
   mpHideQueueOffer();
   closeAll();
+  reshowResultIfScoring();
 });
 $('mpCancelReqBtn').addEventListener('click', function(){
   mpCancelJoinRequest(false);
@@ -5236,7 +5326,7 @@ $('mpChatBtn').addEventListener('click', mpOpenChat);
 $('resultChatBtn').addEventListener('click', mpOpenChat);
 $('chatSendBtn').addEventListener('click', mpSendChat);
 $('chatInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpSendChat(); });
-$('chatCloseBtn').addEventListener('click', function(){ closeAll(); });
+$('chatCloseBtn').addEventListener('click', function(){ closeAll(); /* Between hands, "back to the game" is the hand scores: closing chat must never strand the table without its Next deal button (see reshowResultIfScoring). */ reshowResultIfScoring(); });
 $('voiceJoinBtn').addEventListener('click', vcJoin);
 $('voiceEndBtn').addEventListener('click', function(){ vcLeave(false); });
 $('mpVoiceEndBtn').addEventListener('click', function(){ vcLeave(false); });
@@ -6064,6 +6154,7 @@ $('mpFriendsBtn').addEventListener('click', frOpen);
 $('mpFriendsBtn2').addEventListener('click', frOpen);
 $('frCloseBtn').addEventListener('click', function(){
   closeAll();
+  reshowResultIfScoring();
   /* If the lobby was open underneath, return to it so the table isn't lost. */
   if(typeof MP!=='undefined' && MP && MP.active && MP.code && MP.meta && MP.meta.status==='lobby') mpEnterLobby();
 });
