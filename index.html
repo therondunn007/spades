@@ -1113,7 +1113,13 @@ function startGame(count){
          host's say-so at the table is what lets a new player in. */
       var jr=MP.joinRequests ? MP.joinRequests[String(absSeat)] : null;
       var jrBlocks=seatInfo && ((jr && jr.uid===seatInfo.uid && jr.status!=='approved') || (MP.declinedUids && MP.declinedUids[seatInfo.uid]));
-      if(seatInfo && seatInfo.uid && !jrBlocks){
+      /* A seat the host handed to the computer stays the computer's
+         in a fresh game too, even if the replaced player's seat
+         entry is still in the room — the replacement record (see
+         mpMarkReplaced) outranks the stale claim. */
+      var repInfo=MP.replaced ? MP.replaced[String(absSeat)] : null;
+      var repBlocks=!!(repInfo && seatInfo && repInfo.uid===seatInfo.uid);
+      if(seatInfo && seatInfo.uid && !jrBlocks && !repBlocks){
         /* Remote names are untrusted input from the database — strip any
            markup characters before the name is ever rendered. */
         G.players[mi].name=cleanName(seatInfo.name)||G.players[mi].name;
@@ -1334,6 +1340,10 @@ function aiPick(pIdx){
 }
 function scheduleAI(){
   if(!G||G.phase!=='playing') return;
+  /* Recovery: a table somehow left in "playing" with no cards
+     anywhere settles the hand instead of waiting forever for a
+     lead card nobody holds. */
+  if(G.players.every(function(p){ return p.hand.length===0; })){ endHand(); return; }
   if(G.players[G.current].human) { renderAll(); return; }
   var myEpoch=epoch, idx=G.current;
   setTimeout(function(){
@@ -1395,8 +1405,14 @@ function finishTrick(){
   var w=G.trick[trickWinnerIdx(G.trick)].p;
   G.players[w].tricks++;
   G.trick=[]; G.trickNo++; G.leader=w; G.current=w; G.phase='playing';
+  /* Hand over? Settle it BEFORE anything renders or publishes: the
+     cleared-table "playing" state with every hand empty must never
+     be what the room — or the host's backup of it — is left holding.
+     A phone picking the table up from that state has no cards to
+     lead, no bid screen and no way forward (the table that sat on
+     "Waiting for the lead card" after a finished round). */
+  if(G.players.every(function(p){ return p.hand.length===0; })){ endHand(); return; }
   renderAll();
-  if(G.players[0].hand.length===0){ endHand(); return; }
   setMsg(w===0 ? '<b>'+escHtml(G.players[0].name)+'</b> took the trick — <b>your lead</b>. Tap a highlighted card.' : '<b>'+escHtml(G.players[w].name)+'</b> leads trick '+G.trickNo+'.');
   scheduleAI();
 }
@@ -1518,7 +1534,15 @@ function renderAll(){
      and the side players at the left and right edges. The mapping
      mirrors the seats around the table (see slotFor above), and view
      index 0 is always the player holding this phone. */
-  var ta=$('trickArea'); ta.innerHTML='';
+  var ta=$('trickArea');
+  /* The played cards only change when the trick itself changes, but
+     renderAll also runs for score, presence and message updates —
+     rebuilding the slots every time replayed their deal-in fade and
+     the cards on the table visibly flickered. Same trick, same DOM. */
+  var trickSig=G.phase+'|'+G.trickNo+'|'+G.trick.map(function(t){ return t.p+':'+t.card.suit+t.card.rank; }).join(',');
+  if(ta._sig!==trickSig){
+  ta._sig=trickSig;
+  ta.innerHTML='';
   if(G.trick.length===0){
     ta.innerHTML='<div class="trick-empty">'+(G.phase==='review'?'Your cards are dealt — look them over below, then tap Ready when you\'re set to bid.':(G.phase==='bidding'?'Bidding…':'Waiting for the lead card. Spades can lead — no need to break them first.'))+'</div>';
   } else {
@@ -1535,6 +1559,7 @@ function renderAll(){
       var who=document.createElement('div'); who.className='who'; who.textContent=G.players[t.p].name;
       slot.appendChild(who); ta.appendChild(slot);
     });
+  }
   }
   /* hand */
   var handEl=$('hand'); handEl.innerHTML='';
@@ -1888,7 +1913,14 @@ var MP={
      is the one standing in line (queueing / _queueCode). */
   queue:{}, queueHold:null, _queueWatching:false,
   queueing:false, _queueCode:null, _queueClaiming:false, _queueSeenMine:false,
-  _queueOfferCode:null, _queueHoldWritten:null, _queueUiTimer:null, _queueHoldMine:false
+  _queueOfferCode:null, _queueHoldWritten:null, _queueUiTimer:null, _queueHoldMine:false,
+  /* Seats the host has handed to the computer for good (Replace with
+     AI): { seat: { uid, name, at } }. The host writes it to the room,
+     carries it in the public state and the host backup, and keeps a
+     copy on its own phone — so a replaced player's phone can never
+     walk back into the seat on a refresh or a reconnect and push
+     the computer out again. */
+  replaced:{}, _replacedWatching:false, _replacedNotice:false, _lastAppliedKey:''
 };
 function mpMyName(){ return playerNameFor(selectedCount,0); }
 /* Seat maths: the game engine always sees the local player at index 0,
@@ -2520,6 +2552,10 @@ function mpIsSeatAway(absSeat){
   if(!MP.active) return false;
   var info=mpSeatInfo(absSeat);
   if(!info) return false; /* empty seat = computer player, never "away" */
+  /* A seat the host handed to the computer is never "away", even if
+     the replaced player's stale seat entry is still in the room —
+     the seat wears the computer's name now, not an Away label. */
+  if(MP.replaced && MP.replaced[String(absSeat)]) return false;
   var pr=MP.presence ? MP.presence[String(absSeat)] : null;
   if(!pr) return false; /* no heartbeat yet (just joined) — give it a moment */
   return pr.connected===false;
@@ -2533,6 +2569,7 @@ function mpSetupPresence(){
   /* Being seated at a table is also what turns on table chat (text +
      voice presence) — every route into a seat funnels through here. */
   mpChatWatch();
+  mpWatchReplaced();
   var pref=mpRef('presence/'+MP.mySeat);
   var stamp=function(){ return (window.firebase && firebase.database && firebase.database.ServerValue) ? firebase.database.ServerValue.TIMESTAMP : Date.now(); };
   function writeUp(){
@@ -2560,6 +2597,11 @@ function mpSetupPresence(){
     MP._uiTimer=setInterval(function(){
       if(!MP.active) return;
       mpRenderPresenceUI();
+      /* Host self-heal: a table this phone drives that is stuck in
+         "playing" with no cards anywhere (a hand that ended while
+         hosting changed hands) settles the hand, so the next one
+         can be dealt instead of the table sitting dead. */
+      if(MP.isHost && G && G.phase==='playing' && G.players.every(function(p){ return p.hand.length===0; })) endHand();
       mpCheckHostHandover();
       /* The driving phone also minds the join queue on this tick:
          expire an unclaimed seat hold, then offer any open seat to
@@ -2604,6 +2646,7 @@ function mpWatchPresence(){
    computer) clears the same way, since an empty seat is never "away". */
 function mpPresenceSeat(seat, pr){
   var k=String(seat);
+  var wasAway=mpIsSeatAway(seat);
   if(pr) MP.presence[k]=pr; else delete MP.presence[k];
   if(pr && pr.connected===false){
     if(!MP.awaySince[k]) MP.awaySince[k]=(typeof pr.lastSeen==='number' ? pr.lastSeen : Date.now());
@@ -2612,8 +2655,13 @@ function mpPresenceSeat(seat, pr){
   }
   mpRenderPresenceUI();
   mpCheckHostHandover();
-  /* The table re-renders often; make sure away badges survive it. */
-  if(G && $('gameScreen').classList.contains('on')) renderAll();
+  /* Presence snapshots also arrive for plain heartbeats — a fresh
+     lastSeen, nothing else changed. Re-rendering the whole table
+     for those rebuilt every card on it several times a minute and
+     the played cards flickered; only an actual away/present change
+     earns a repaint, so the away badges still land the moment they
+     flip. */
+  if(mpIsSeatAway(seat)!==wasAway && G && $('gameScreen').classList.contains('on')) renderAll();
 }
 /* Away seats across the table: banner in the game, tags in the lobby,
    and — for the host — a Replace-with-AI button once a seat has been
@@ -2661,6 +2709,102 @@ function mpRenderPresenceUI(){
   }
   if($('lobbyOverlay').classList.contains('on')) mpRenderLobby();
 }
+/* ---- Replaced seats: the durable record of Replace with AI ----
+   Handing an away seat to the computer used to live only in the
+   host's running game: the seat's room entry was removed, but the
+   replaced player's phone kept its saved session, and the next time
+   it opened the game — or the host's phone refreshed and rebuilt
+   the table from the room — the old claim walked straight back in
+   and pushed the computer out, leaving the seat wearing the
+   computer's name with the person's Away label. So a replacement is
+   now a record every phone can see: the host writes it to the room,
+   carries it in the public state and the host backup, and keeps a
+   copy on its own phone. Every route back into a seat checks it. */
+function mpSaveReplacedLocal(){
+  if(!MP.code) return;
+  try{
+    if(MP.replaced && Object.keys(MP.replaced).length) localStorage.setItem('spades.mpReplaced.v1.'+MP.code, JSON.stringify(MP.replaced));
+    else localStorage.removeItem('spades.mpReplaced.v1.'+MP.code);
+  }catch(e){}
+}
+function mpLoadReplacedLocal(code){
+  try{
+    var v=JSON.parse(localStorage.getItem('spades.mpReplaced.v1.'+code)||'null');
+    if(v && typeof v==='object') return v;
+  }catch(e){}
+  return {};
+}
+function mpMarkReplaced(absSeat, uid, name){
+  if(!MP.replaced) MP.replaced={};
+  MP.replaced[String(absSeat)]={ uid:uid||null, name:name||'Player', at:Date.now() };
+  if(MP.roomRef) mpRef('replaced/'+absSeat).set(MP.replaced[String(absSeat)]).catch(function(){});
+  mpSaveReplacedLocal();
+  if(MP.isHost) mpHostSync(); /* the public state carries it at once */
+}
+function mpClearReplaced(absSeat){
+  if(MP.replaced && MP.replaced[String(absSeat)]){
+    delete MP.replaced[String(absSeat)];
+    if(MP.roomRef) mpRef('replaced/'+absSeat).set(null).catch(function(){});
+    mpSaveReplacedLocal();
+  }
+}
+function mpClearAllReplaced(){
+  if(!MP.replaced) MP.replaced={};
+  Object.keys(MP.replaced).forEach(function(k){ mpClearReplaced(parseInt(k,10)); });
+}
+/* Is this phone the player a replacement record names at that seat? */
+function mpReplacedCoversMe(absSeat){
+  var r=MP.replaced && MP.replaced[String(absSeat)];
+  return !!(r && r.uid && MP.uid && r.uid===MP.uid);
+}
+/* A replaced player's phone stands down for good: no rejoin, no join
+   request, no presence heartbeat quietly re-claiming the seat. */
+function mpReplacedStandDown(){
+  if(MP._replacedNotice) return;
+  MP._replacedNotice=true;
+  mpLeaveTable();
+  backToStart();
+  toast('The host replaced you with the computer at that table — that game carries on without you.');
+}
+/* Read a room's replacement records for a phone deciding whether it
+   still belongs at the table: the records' own node first, the
+   public state — which every phone can read — as the fallback. */
+function mpFetchReplaced(ref){
+  var fromPublic=function(){
+    return ref.child('public').once('value').then(function(psnap){
+      var pub=psnap.val();
+      return (pub && pub.replaced && typeof pub.replaced==='object') ? pub.replaced : {};
+    }).catch(function(){ return {}; });
+  };
+  return ref.child('replaced').once('value').then(function(snap){
+    var v=snap.val();
+    if(v && typeof v==='object' && Object.keys(v).length) return v;
+    return fromPublic();
+  }).catch(function(){ return fromPublic(); });
+}
+function mpWatchReplaced(){
+  if(MP._replacedWatching || !MP.roomRef) return;
+  MP._replacedWatching=true;
+  /* Per-seat listeners, like presence and Ready: the database rules
+     grant the room's nodes one at a time. */
+  for(var s=0;s<4;s++){
+    (function(seat){
+      mpListen(mpRef('replaced/'+seat), 'value', function(snap){
+        var v=snap.val();
+        if(!MP.replaced) MP.replaced={};
+        if(v) MP.replaced[String(seat)]=v; else delete MP.replaced[String(seat)];
+        if(MP.isHost){ mpSaveReplacedLocal(); mpHostCheckJoinRequests(); }
+        mpRenderPresenceUI();
+        if(G && $('gameScreen').classList.contains('on')) renderAll();
+        /* My own replacement arriving live: stand down. */
+        if(!MP.isHost && MP.active && mpReplacedCoversMe(seat)) mpReplacedStandDown();
+      }, function(err){
+        if(window.console) console.warn('Spades: replacement record for seat '+(seat+1)+' could not be read ('+((err && err.code)||'permission denied')+').');
+      });
+    })(s);
+  }
+}
+
 /* Host only: hand an away seat to the computer so the game keeps moving.
    The seat's room entry is removed (its hand goes with the host's table),
    and if the game was waiting on that seat, the AI plays it from here. */
@@ -2668,6 +2812,12 @@ function mpReplaceWithAI(absSeat){
   if(!MP.isHost || !MP.roomRef) return;
   var info=mpSeatInfo(absSeat);
   var nm=info ? (cleanName(info.name)||'Player') : 'Player';
+  /* Record the replacement durably FIRST — room node, public state,
+     host backup, and a copy on this phone — so neither a refresh
+     here nor the replaced player's phone reopening the game can
+     undo it, whatever happens to the seat entry itself. */
+  if(info && info.uid) mpMarkReplaced(absSeat, info.uid, nm);
+  delete MP.joinRequests[String(absSeat)];
   mpRef('players/'+absSeat).set(null).catch(function(){});
   mpRef('presence/'+absSeat).set(null).catch(function(){});
   mpRef('ready/'+absSeat).set(null).catch(function(){});
@@ -2756,9 +2906,53 @@ function mpAttemptTakeover(){
     });
   }).catch(function(){ MP._takeoverBusy=false; });
 }
+/* Drive a table this phone has just taken over (or rebuilt): whatever
+   phase the backup caught the game in, something on this phone must
+   own the next step — a finished trick nobody swept, a hand that
+   ended while the old host was going away, a score sheet nobody is
+   showing. Without this, a rebuild could leave the table sitting on
+   "Waiting for the lead card" with no cards anywhere and no way on. */
+function mpHostDrive(){
+  if(!MP.isHost || !G) return;
+  if(G.phase==='trickEnd'){ finishTrick(); return; }
+  if(G.phase==='playing' && G.players.every(function(p){ return p.hand.length===0; })){ endHand(); return; }
+  if(G.phase==='scoring'){ mpShowHostResult(); return; }
+  if(G.phase==='bidding' && G.current>=0 && G.players[G.current]) takeBid(G.current);
+  else if(G.phase==='playing') scheduleAI();
+  else if(G.phase==='review') mpCheckReady();
+}
+/* Show the hand-result sheet on a host that rebuilt a table already
+   in scoring: the scores are final (endHand settled them on the old
+   host), so this only re-presents them — totals, no re-scoring —
+   with the usual Next deal button, and the render publishes the
+   sheet to the guests like any other. */
+function mpShowHostResult(){
+  if(!G) return;
+  var ents=entities();
+  var html='<table class="score-table"><tr><th>Player / team</th><th>Total</th></tr>';
+  ents.forEach(function(ent){ html+='<tr><td>'+escHtml(ent.name)+'</td><td><b>'+entityScoreOf(ent.members[0])+'</b></td></tr>'; });
+  html+='</table>';
+  if(G.over){
+    var win=ents[0], best=-Infinity;
+    ents.forEach(function(ent){ var s=entityScoreOf(ent.members[0]); if(s>best){ best=s; win=ent; } });
+    $('resultTitle').textContent='🏆 '+win.name+' win'+(win.members.length>1?'':'s')+' the game!';
+    html+='<p><b>'+escHtml(win.name)+'</b> reached '+best+' points — first to 35 takes it. Nice game!</p>';
+    $('resultBtn').textContent='Play again — fresh game';
+  } else {
+    $('resultTitle').textContent='Hand '+G.handNo+' — scores';
+    html+='<p class="small muted">Scoring: '+SCORING_NAMES[scoringMode()]+' · First to 35 wins. Next hand gets a brand-new shuffle.</p>';
+    $('resultBtn').textContent='Next deal';
+  }
+  $('resultBody').innerHTML=html;
+  $('resultOverlay').classList.add('on');
+  renderAll();
+}
 /* Rebuild an authoritative table on this phone and start hosting it:
    used by host handover, and by the original host reopening mid-game. */
 function mpBecomeHost(backup){
+  /* The replacement records travel with the backup, so a table that
+     changes hosts keeps its AI replacements too. */
+  if(backup && backup.replaced && typeof backup.replaced==='object') MP.replaced=backup.replaced;
   var rebuilt=mpRebuildFromBackup(backup);
   /* Hosting is only ever rebuilt from the room's backup — never from an
      unrelated (solo) game that happens to be on this phone. */
@@ -2775,11 +2969,11 @@ function mpBecomeHost(backup){
   renderAll();
   mpHostSync();
   mpRenderPresenceUI();
-  /* Drive whatever the table was waiting on: takeBid handles every case —
-     an AI bid, the local bid sheet, or waiting on a friend's phone. */
-  if(G && G.phase==='bidding' && G.current>=0 && G.players[G.current]) takeBid(G.current);
-  else if(G && G.phase==='playing') scheduleAI();
-  else if(G && G.phase==='review') mpCheckReady();
+  /* Drive whatever the table was waiting on — including the states
+     a table can be stranded in: a finished trick nobody swept, a
+     hand that ended as hosting changed hands, a score sheet nobody
+     is showing (see mpHostDrive). */
+  if(G) mpHostDrive();
   toast('You\'re hosting the table now — the game keeps going ♠');
   setMsg('<b>'+escHtml(mpMyName())+'</b> is hosting the table now — play continues.');
   mpHostSync();
@@ -2802,7 +2996,7 @@ function mpSerializeBackup(){
     count:G.count, scoringMode:G.scoringMode, phase:G.phase,
     dealer:mpViewToAbs(G.dealer), current:mpViewToAbs(G.current), leader:mpViewToAbs(G.leader),
     trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
-    teamScores:teamScores, absPlayers:absPlayers,
+    teamScores:teamScores, absPlayers:absPlayers, replaced:MP.replaced||{},
     trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; })
   };
 }
@@ -2819,6 +3013,11 @@ function mpRebuildFromBackup(backup){
     var abs=toAbs(v);
     var src=backup.absPlayers[abs]||{name:'Player',hand:[],bid:null,tricks:0,score:0};
     var seatInfo=mpSeatInfo(abs);
+    /* A seat the host handed to the computer stays the computer's,
+       even if the replaced player's seat entry is still in the
+       room: the replacement record outranks the stale claim, so a
+       rebuilt table never resurrects the person over the AI. */
+    if(seatInfo && MP.replaced && MP.replaced[String(abs)] && MP.replaced[String(abs)].uid===seatInfo.uid) seatInfo=null;
     var uid=seatInfo ? seatInfo.uid : (src.uid||null);
     var hand=(src.hand||[]).slice();
     players.push({
@@ -3196,7 +3395,8 @@ function mpCreate(){
 }
 function mpJoinError(err, code){
   var m=(err && err.message)||'';
-  if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
+  if(m==='replaced') mpSetStatus('The host replaced you with the computer at that table — that game is carrying on without you. Start or join a different table any time.');
+  else if(m==='noroom') mpSetStatus('No table with that code — check the code and try again.');
   else if(m==='started') mpSetStatus('That table has already started playing. Ask the host for a new table.');
   else if(m==='full'){
     /* Full is not a dead end any more: offer a place in the queue. */
@@ -3232,6 +3432,20 @@ function mpJoin(code, pref){
       }
       return ref.child('players').once('value').then(function(psnap){
         var players=psnap.val()||{};
+        /* Replaced by the computer? The host's replacement record
+           ends this phone's claim on the table for good: no rejoin
+           and no fresh join request, whatever the saved session or
+           a stale seat entry says — that is what stops a refresh
+           from putting the person back over the AI. */
+        return mpFetchReplaced(ref).then(function(rep){
+        MP.replaced=rep||{};
+        var iAmReplaced=false;
+        Object.keys(MP.replaced).forEach(function(k){ var r=MP.replaced[k]; if(r && r.uid===MP.uid) iAmReplaced=true; });
+        if(iAmReplaced){
+          MP._replacedNotice=true;
+          mpClearSession();
+          throw new Error('replaced');
+        }
         /* Reconnect: if this phone already holds a seat, it keeps that
            exact seat — even mid-game — and its hand is still in the room
            waiting for it. Only brand-new visitors are turned away from a
@@ -3267,6 +3481,7 @@ function mpJoin(code, pref){
           return;
         }
         return mpJoinClaim(code, ref, meta, pref);
+        });
       });
       });
     });
@@ -3303,6 +3518,10 @@ function mpJoinClaim(code, ref, meta, pref){
              The original host reopening after a handover rejoins as a
              regular player at their own seat. */
           MP.isHost = (meta.hostUid===MP.uid);
+          /* The host's own copy of this table's replacement records,
+             kept on the phone so a refresh can't lose them before
+             the room's copies land (see mpMarkReplaced). */
+          if(MP.isHost && !Object.keys(MP.replaced||{}).length) MP.replaced=mpLoadReplacedLocal(code);
           selectedCount=meta.count;
           if(meta.scoringMode) setScoringMode(meta.scoringMode, true);
           mpSetStatus('');
@@ -3488,6 +3707,10 @@ function mpHostCheckJoinRequests(){
     var gp=G.players[mpAbsToView(s)];
     if(gp && gp.uid===info.uid) continue; /* already a player in this game */
     if(MP.declinedUids[info.uid]) continue; /* already said no to this phone */
+    /* A claim from a player the host already replaced with the
+       computer is not a join request — the replacement stands, and
+       their phone has been told so (see mpReplacedStandDown). */
+    if(MP.replaced && MP.replaced[String(s)] && MP.replaced[String(s)].uid===info.uid) continue;
     /* A claim from the person this table is holding a seat for — the
        first in the join queue — is not a request to decide on: the
        seat was already offered to them, so seat them at once. The
@@ -3498,6 +3721,7 @@ function mpHostCheckJoinRequests(){
       var holdFor=(MP.queueHold && MP.queueHold.uid===info.uid && MP.queueHold.seat===s)
         || (MP._queueHoldWritten && MP._queueHoldWritten.uid===info.uid && MP._queueHoldWritten.seat===s && Date.now()<MP._queueHoldWritten.until+60000);
       if(holdFor){
+        mpClearReplaced(s); /* the queue's claim legitimately re-lets the seat */
         MP.joinRequests[String(s)]={ uid:info.uid, name:cleanName(info.name)||'Player', status:'approved', pref:null };
         if(MP.queueHold && MP.queueHold.uid===info.uid) mpRef('queueHold').set(null).catch(function(){});
         mpHostSync(); /* publish the acceptance in the public state at once */
@@ -3572,8 +3796,12 @@ function mpAcceptJoin(absSeat){
     toast('That seat is being held for the next person in the queue — they have a moment to claim it first.');
     return;
   }
+  /* Letting someone in for real lifts any replacement record on the
+     seat(s) involved — the seat is a person's again. */
+  mpClearReplaced(absSeat);
   var target=mpReseatTarget(r, absSeat);
   if(target!==absSeat){
+    mpClearReplaced(target);
     /* Move the claim to the seat their pick names, then approve there:
        the public state's joinAccepted follows the new seat, and their
        phone follows the move (see mpWatchJoinRequest). */
@@ -3756,6 +3984,7 @@ function mpWatchLobby(){
 }
 function mpHostStart(){
   if(!MP.isHost || !MP.roomRef) return;
+  mpClearAllReplaced(); /* a brand-new game at this table starts clean */
   mpRef('meta/status').set('playing');
   if(MP.meta) MP.meta.status='playing';
   otPublish(true);
@@ -3786,7 +4015,8 @@ function mpPublicState(){
     trickNo:G.trickNo, cardsPer:G.cardsPer, handNo:G.handNo, over:!!G.over,
     teamScores:teamScores, players:players, hostUid:MP.uid,
     trick:G.trick.map(function(t){ return { p:mpViewToAbs(t.p), card:t.card }; }),
-    msg:$('msg').innerHTML
+    msg:$('msg').innerHTML,
+    replaced:MP.replaced||{}
   };
   if(G.phase==='scoring'){
     pub.result={ title:$('resultTitle').textContent, body:$('resultBody').innerHTML, btn:'Waiting for the host…' };
@@ -4035,6 +4265,21 @@ function mpApplyPublic(pub){
 }
 function mpApplyPublicNow(pub){
   if(!MP.active || MP.isHost) return;
+  /* Replacement records ride in the public state: if the host has
+     handed MY seat to the computer, this phone stands down for good
+     instead of quietly re-claiming the seat on its next refresh. */
+  if(pub.replaced && typeof pub.replaced==='object'){
+    MP.replaced=pub.replaced;
+    if(mpReplacedCoversMe(MP.mySeat)){ mpReplacedStandDown(); return; }
+  }
+  /* The same state can reach this phone twice — the public write and
+     the private-hand write each trigger an apply. Applying it twice
+     rebuilt the whole table twice for one move (part of the card
+     flicker), so an apply identical to the last one is a no-op. */
+  var applyKey='';
+  try{ applyKey=JSON.stringify(pub)+'|'+JSON.stringify(MP.myCards||[]); }catch(e){}
+  if(applyKey && applyKey===MP._lastAppliedKey) return;
+  MP._lastAppliedKey=applyKey;
   if(pub.hostUid) MP.hostUid=pub.hostUid;
   /* A human uid in the public state that wasn't there before is a
      player who has just been seated mid-game (the host dealt them
@@ -4155,6 +4400,7 @@ function mpLeaveTable(){
   MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
   MP.pendingInvites={}; MP._localInviteSent=false; MP._textInviteCount=0; MP._joinedNote=null; MP._pubUids=null;
   MP.queue={}; MP.queueHold=null; MP._queueWatching=false; MP._queueHoldWritten=null; MP._queueOfferCode=null;
+  MP.replaced={}; MP._replacedWatching=false; MP._lastAppliedKey=''; MP._chatWatching=false;
   if(MP._queueUiTimer){ clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
   var qbox=$('mpQueueBox'); if(qbox) qbox.hidden=true;
   var qbtn2=$('mpQueueBtn'); if(qbtn2) qbtn2.style.display='none';
@@ -4218,6 +4464,7 @@ function mpStepOut(){
   MP.joinRequests={}; MP.declinedUids={}; MP.declineNote=null; MP.joinPending=false; MP._joinResolved=false;
   MP.pendingInvites={}; MP._localInviteSent=false; MP._textInviteCount=0; MP._joinedNote=null; MP._pubUids=null;
   MP.queue={}; MP.queueHold=null; MP._queueWatching=false; MP._queueHoldWritten=null; MP._queueOfferCode=null;
+  MP.replaced={}; MP._replacedWatching=false; MP._lastAppliedKey=''; MP._chatWatching=false;
   if(MP._queueUiTimer){ clearInterval(MP._queueUiTimer); MP._queueUiTimer=null; }
   var qbox=$('mpQueueBox'); if(qbox) qbox.hidden=true;
   var qbtn2=$('mpQueueBtn'); if(qbtn2) qbtn2.style.display='none';
@@ -4427,7 +4674,7 @@ function otAskJoin(code){
    Voice keeps running when the chat sheet closes — talk while you
    play — and for as long as it runs, the table shows a red End
    voice chat button. Ending chat (the sheet) never ends voice. */
-var VC={ active:false, sid:null, stream:null, pcs:{}, people:{}, sigWatched:{} };
+var VC={ active:false, sid:null, stream:null, pcs:{}, people:{}, sigWatched:{}, _hb:null, _connRef:null, _connCb:null };
 function mpChatWatch(){
   if(MP._chatWatching || !MP.roomRef) return;
   MP._chatWatching=true;
@@ -4528,15 +4775,53 @@ function vcSyncUI(){
 function vcOnPeople(){
   vcSyncUI();
   if(!VC.active) return;
-  /* A participant who left voice loses their connection here. New
-     arrivals need no action from this side: the joiner always makes
-     the offers, so their offer is already on its way — I only need
-     to be listening for their signals. */
+  /* Presence flaps are not departures: a phone whose connection
+     blips vanishes from the voice list for a few seconds and then
+     re-announces itself. Closing the call on the first snapshot
+     that misses someone is what made voice chat "start, then
+     stop". A missing participant is only given up on after a grace
+     period (see vcSweepPeers); one who comes back keeps the call
+     they had. New arrivals need no offer from this side: the
+     joiner always makes the offers, so their offer is already on
+     its way — I only need to be listening for their signals. */
   Object.keys(VC.pcs).forEach(function(uid){
-    if(!VC.people[uid]) vcClosePeer(uid);
+    var rec=VC.pcs[uid];
+    if(!VC.people[uid]){ if(!rec.lostAt) rec.lostAt=Date.now(); }
+    else rec.lostAt=0;
   });
   Object.keys(VC.people).forEach(function(uid){
-    if(uid!==MP.uid) vcWatchSignals(uid);
+    if(uid===MP.uid) return;
+    vcWatchSignals(uid);
+    /* Someone in voice with no connection on this phone — an
+       earlier failure closed it, or their rejoin raced my
+       snapshot. One side of each pair (the smaller uid) re-offers,
+       so the pair always heals itself instead of waiting on an
+       offer that never comes. */
+    if(!VC.pcs[uid] && MP.uid<uid) vcCall(uid);
+  });
+}
+/* Give up on peers whose owner has been out of the voice list past
+   the grace period — a real departure, not a connection flap.
+   Runs on the voice heartbeat. */
+function vcSweepPeers(){
+  if(!VC.active) return;
+  var now=Date.now();
+  Object.keys(VC.pcs).forEach(function(uid){
+    var rec=VC.pcs[uid];
+    if(rec.lostAt && now-rec.lostAt>20000 && !VC.people[uid]) vcClosePeer(uid);
+  });
+}
+/* Write (or rewrite) this phone's voice presence, re-registering
+   the disconnect removal for the current connection each time. */
+function vcAnnounce(first){
+  if(!VC.active || !MP.roomRef || !MP.uid) return;
+  var vref=mpRef('voice/'+MP.uid);
+  try{ vref.onDisconnect().remove(); }catch(e){}
+  vref.set({ name:mpMyName(), sid:VC.sid, ts:Date.now() }).catch(function(){
+    if(first){
+      var st=$('chatStatus');
+      if(st) st.textContent='Voice chat could not announce you at the table — this table\'s database may not allow voice chat yet.';
+    }
   });
 }
 function vcJoin(){
@@ -4550,12 +4835,27 @@ function vcJoin(){
     VC.stream=stream;
     VC.sid=String(MP.uid).slice(0,6)+'-'+Date.now().toString(36);
     VC.active=true;
-    var vref=mpRef('voice/'+MP.uid);
-    try{ vref.onDisconnect().remove(); }catch(e){}
-    vref.set({ name:mpMyName(), sid:VC.sid, ts:Date.now() }).catch(function(){
-      var st=$('chatStatus');
-      if(st) st.textContent='Voice chat could not announce you at the table — this table\'s database may not allow voice chat yet.';
-    });
+    vcAnnounce(true);
+    /* Stay announced. A mobile connection flaps all the time —
+       signal dip, app switch, screen off — and each flap fires the
+       onDisconnect removal, so this phone silently fell out of
+       voice while its screen still said it was in, and everyone
+       else's phone closed the call. Re-announce the moment the
+       connection comes back, and refresh on a heartbeat so even a
+       missed flap heals itself. */
+    if(window.firebase && firebase.database){
+      try{
+        VC._connRef=firebase.database().ref('.info/connected');
+        VC._connCb=function(snap){ if(snap.val()===true && VC.active) vcAnnounce(false); };
+        VC._connRef.on('value', VC._connCb);
+      }catch(e){}
+    }
+    if(VC._hb) clearInterval(VC._hb);
+    VC._hb=setInterval(function(){
+      if(!VC.active){ clearInterval(VC._hb); VC._hb=null; return; }
+      vcAnnounce(false);
+      vcSweepPeers();
+    }, 15000);
     vcSyncUI();
     /* I am the newest arrival: offer to everyone already in voice. */
     Object.keys(VC.people||{}).forEach(function(uid){
@@ -4569,6 +4869,13 @@ function vcJoin(){
 function vcLeave(silent){
   var was=VC.active;
   VC.active=false;
+  if(VC._hb){ clearInterval(VC._hb); VC._hb=null; }
+  if(VC._connRef && VC._connCb){ try{ VC._connRef.off('value', VC._connCb); }catch(e){} VC._connRef=null; VC._connCb=null; }
+  /* Signal watching belongs to the room voice was running in — a
+     fresh room starts with a clean slate, or its offers would be
+     listened for in the old room and never arrive. */
+  VC.sigWatched={};
+  VC.people={};
   Object.keys(VC.pcs).forEach(function(uid){ vcClosePeer(uid); });
   if(VC.stream){
     VC.stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} });
@@ -4588,8 +4895,8 @@ function vcLeave(silent){
 function vcPeer(uid){
   if(VC.pcs[uid]) return VC.pcs[uid];
   var pc=null;
-  try{ pc=new RTCPeerConnection({ iceServers:[{ urls:'stun:stun.l.google.com:19302' }] }); }catch(e){ return null; }
-  var rec={ pc:pc, iceQ:[], remoteSet:false, audio:null };
+  try{ pc=new RTCPeerConnection({ iceServers:[{ urls:'stun:stun.l.google.com:19302' },{ urls:'stun:stun1.l.google.com:19302' }] }); }catch(e){ return null; }
+  var rec={ pc:pc, iceQ:[], remoteSet:false, audio:null, lostAt:0 };
   VC.pcs[uid]=rec;
   if(VC.stream) VC.stream.getTracks().forEach(function(t){ try{ pc.addTrack(t, VC.stream); }catch(e){} });
   pc.onicecandidate=function(ev){
@@ -4608,8 +4915,27 @@ function vcPeer(uid){
     var pr=rec.audio.play();
     if(pr && typeof pr.catch==='function') pr.catch(function(){});
   };
+  pc.oniceconnectionstatechange=function(){
+    if(pc.iceConnectionState==='failed'){
+      /* A failed path is not a hang-up: phone networks drop routes
+         mid-call (cell handover, NAT rebinding), and closing the
+         call here is what ended voice chats that had only just
+         started. The pair's designated side asks for fresh
+         candidates (an ICE restart); the other side answers the
+         new offer when it lands, and the call carries on. */
+      if(MP.uid<uid){
+        try{
+          pc.createOffer({ iceRestart:true }).then(function(off){
+            return pc.setLocalDescription(off);
+          }).then(function(){
+            vcSignal(uid, { kind:'offer', sdp:pc.localDescription.sdp });
+          }).catch(function(){});
+        }catch(e){}
+      }
+    }
+  };
   pc.onconnectionstatechange=function(){
-    if(pc.connectionState==='failed' || pc.connectionState==='closed') vcClosePeer(uid);
+    if(pc.connectionState==='closed') vcClosePeer(uid);
   };
   vcWatchSignals(uid);
   return rec;
@@ -4853,7 +5179,7 @@ $('lobbyCopyBtn').addEventListener('click', function(){
       /* If the table is gone (finished, or the seat was replaced after a
          long absence), don't strand the player on this sheet. */
       setTimeout(function(){
-        if(!MP.active && !MP.joinPending && !MP.queueing && !MP._queueOfferCode){
+        if(!MP.active && !MP.joinPending && !MP.queueing && !MP._queueOfferCode && !MP._replacedNotice){
           mpClearSession();
           closeAll();
           toast('That table has finished — start or join a new one ♠');
