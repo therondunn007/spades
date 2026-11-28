@@ -721,6 +721,18 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
   </div>
 </div>
 
+<!-- ============ JOINING: CHOOSE YOUR NAME FIRST ============ -->
+<div class="overlay" id="joinNameOverlay" role="dialog" aria-modal="true" aria-label="Choose your name to join the table">
+  <div class="sheet">
+    <h2>♠ One thing first — your name</h2>
+    <p class="small muted">You're joining a table, and everyone there sees you by the name you play under — so pick yours before you sit down. It's remembered for next time, and you can change it later in Menu → Player names.</p>
+    <input class="fr-input" id="joinNameInput" maxlength="14" placeholder="Your name" autocomplete="off" aria-label="Your name">
+    <p class="fr-status" id="joinNameStatus" role="status"></p>
+    <button class="big-btn" id="joinNameBtn">Join the table</button>
+    <button class="ghost-btn" id="joinNameCancelBtn">Not now</button>
+  </div>
+</div>
+
 <!-- ============ TABLE CHAT (TEXT + VOICE) ============ -->
 <div class="overlay" id="chatOverlay" role="dialog" aria-modal="true" aria-label="Table chat">
   <div class="sheet">
@@ -1593,7 +1605,7 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','chatOverlay','tablesOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','joinNameOverlay','chatOverlay','tablesOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){
   closeAll();
   var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none';
@@ -1795,7 +1807,7 @@ document.querySelectorAll('.deck-option').forEach(function(btn){
 });
 setDeck('classic', true);
 document.querySelectorAll('.overlay').forEach(function(ov){
-  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay' && ov.id!=='joinAsOverlay' && ov.id!=='notifyOverlay') ov.classList.remove('on'); });
+  ov.addEventListener('click',function(e){ if(e.target===ov && ov.id!=='bidOverlay' && ov.id!=='resultOverlay' && ov.id!=='joinAsOverlay' && ov.id!=='joinNameOverlay' && ov.id!=='notifyOverlay') ov.classList.remove('on'); });
 });
 /* player count selector */
 document.querySelectorAll('#countSeg button').forEach(function(btn){
@@ -2662,6 +2674,10 @@ function mpPresenceSeat(seat, pr){
      earns a repaint, so the away badges still land the moment they
      flip. */
   if(mpIsSeatAway(seat)!==wasAway && G && $('gameScreen').classList.contains('on')) renderAll();
+  /* A player arriving or dropping off changes who is actually at the
+     table — the host republishes the open-tables listing right away,
+     so it never keeps counting someone who has gone. */
+  if(mpIsSeatAway(seat)!==wasAway && typeof otPublish==='function') otPublish(true);
 }
 /* Away seats across the table: banner in the game, tags in the lobby,
    and — for the host — a Replace-with-AI button once a seat has been
@@ -3405,9 +3421,54 @@ function mpJoinError(err, code){
   }
   else mpSetStatus('Could not connect to the multiplayer service. Check your internet connection and try again — solo play still works offline.');
 }
+/* ---- Joining means playing under a name ----
+   Every seat at a table carries the name its player chose, and the
+   whole table sees it. A phone that has never picked a name used to
+   sit down under the placeholder "You" — the seat looked taken by
+   somebody nobody could name. So a first-time join now stops at a
+   name sheet before any seat is claimed, on every route in: a typed
+   code, an invite link, a friend's in-app invite, the open-tables
+   list, a mid-game request or the queue. A phone reconnecting to a
+   table it already holds a saved seat at skips the sheet — its name
+   is already on that seat. */
+var MP_NAME_GATE=null;
+function mpJoinHasSavedSeat(code){
+  var sess=mpLoadSession();
+  return !!(sess && sess.code===code);
+}
+function mpAskJoinName(code, pref){
+  MP_NAME_GATE={ code:code, pref:pref };
+  mpSetStatus('');
+  var st=$('joinNameStatus'); if(st) st.textContent='';
+  var inp=$('joinNameInput'); if(inp) inp.value='';
+  $('joinNameOverlay').classList.add('on');
+  setTimeout(function(){ var i=$('joinNameInput'); if(i) i.focus(); }, 80);
+}
+function mpJoinNameSubmit(){
+  var name=cleanName($('joinNameInput').value);
+  if(!name){
+    var st=$('joinNameStatus');
+    if(st) st.textContent='Type the name you want to play under — the table needs to know who sat down.';
+    return;
+  }
+  customNames.you=name;
+  saveSettings();
+  var gate=MP_NAME_GATE; MP_NAME_GATE=null;
+  $('joinNameOverlay').classList.remove('on');
+  if(gate) mpJoin(gate.code, gate.pref);
+}
+function mpJoinNameCancel(){
+  MP_NAME_GATE=null;
+  $('joinNameOverlay').classList.remove('on');
+  mpSetStatus('Joining a table needs a name first — tap Join when you\'ve picked one.');
+}
 function mpJoin(code, pref){
   code=(code||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
   if(code.length!==4){ mpSetStatus('A room code is 4 letters — check the code and try again.'); return; }
+  if(!MP.active && !cleanName(customNames.you) && !mpJoinHasSavedSeat(code)){
+    mpAskJoinName(code, pref);
+    return;
+  }
   if(MP.queueing && MP._queueCode!==code) mpLeaveQueue(true);
   mpHideQueueOffer();
   mpSetStatus('Connecting…');
@@ -4527,6 +4588,10 @@ function mpReenter(){
    the entry; stepping out keeps it, because the table stays open.
    Readers treat an entry older than two hours as gone — the same
    horizon after which the empty-room sweep tidies the room itself.
+   Only players actually present are published: a seat whose player
+   has disconnected keeps its room entry (it is held for their
+   return) but is left out of the listing, so the seat counts and
+   names here always describe who is really at the table.
    Asking to join routes through the ordinary code join, so the
    teammate/opponent pick, the host's let-in decision for a game in
    progress, and the queue for a full table all behave exactly as
@@ -4542,7 +4607,16 @@ function otPublish(force){
   var seats={}, taken=0;
   for(var s=0;s<count;s++){
     var info=MP.seats ? MP.seats[String(s)] : null;
-    if(info && info.uid){ seats[String(s)]=cleanName(info.name||'')||'Player'; taken++; }
+    if(info && info.uid){
+      /* A seat whose player has closed the app or lost signal keeps
+         its room entry — the seat is held for their return — but
+         nobody is actually sitting there, so the listing must not
+         count them: only players who are present right now are
+         published, and a table of ghosts reads as the empty table
+         it really is. */
+      if(typeof mpIsSeatAway==='function' && mpIsSeatAway(s)) continue;
+      seats[String(s)]=cleanName(info.name||'')||'Player'; taken++;
+    }
   }
   var entry={
     hostUid:MP.uid, hostName:cleanName(mpMyName()||'')||'Player', hostSeat:MP.mySeat,
@@ -5100,6 +5174,9 @@ $('notifyBtn').addEventListener('click', function(){
   }
 });
 pushSyncMenuHint();
+$('joinNameBtn').addEventListener('click', mpJoinNameSubmit);
+$('joinNameCancelBtn').addEventListener('click', mpJoinNameCancel);
+$('joinNameInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpJoinNameSubmit(); });
 $('mpJoinBtn').addEventListener('click', function(){ mpJoin($('mpJoinInput').value); });
 $('mpJoinInput').addEventListener('keydown', function(e){ if(e.key==='Enter') mpJoin($('mpJoinInput').value); });
 $('lobbyStartBtn').addEventListener('click', mpHostStart);
