@@ -642,6 +642,26 @@ a.ghost-btn{text-align:center;text-decoration:none;color:var(--text);box-sizing:
   </div>
 </div>
 
+<!-- ============ INVITE — WHEN THE SHARE SHEET WON'T OPEN ============
+     Shown by mpInvite whenever the phone's share sheet can't open (or
+     doesn't exist): the working invite routes — text message, copy the
+     link, or just read the code aloud — right there on one sheet,
+     instead of a toast pointing at buttons that may not be on screen. -->
+<div class="overlay" id="inviteOverlay" role="dialog" aria-modal="true" aria-label="Invite to this table">
+  <div class="sheet">
+    <h2>Invite to table <span id="inviteCodeTitle">····</span></h2>
+    <p class="small muted">Your phone's share sheet didn't open, so here are the other ways to get your friends in — they all land them at this table:</p>
+    <div class="mp-code" id="inviteCode">····</div>
+    <div class="mp-link" id="inviteLink"></div>
+    <a class="big-btn" id="inviteSmsBtn" href="#" style="text-align:center;text-decoration:none;box-sizing:border-box">💬 Text the invite</a>
+    <button class="ghost-btn" id="inviteCopyBtn">Copy the join link</button>
+    <button class="ghost-btn" id="inviteShareBtn">📤 Try the share sheet again</button>
+    <p class="mp-status" id="inviteStatus" role="status"></p>
+    <p class="small muted" style="text-align:center;margin:9px 0 0">Or just tell them the table code above — they open Spades, tap <b>Play with friends</b> and type it in.</p>
+    <button class="ghost-btn" id="inviteCloseBtn">Done</button>
+  </div>
+</div>
+
 <!-- ============ FRIENDS BY HANDLE ============ -->
 <div class="overlay" id="friendsOverlay" role="dialog" aria-modal="true" aria-label="Friends">
   <div class="sheet">
@@ -1605,7 +1625,7 @@ function renderAll(){
 }
 
 /* ================= Overlays & menu wiring ================= */
-function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','joinNameOverlay','chatOverlay','tablesOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
+function closeAll(){ ['menuOverlay','bidOverlay','resultOverlay','howOverlay','installOverlay','deckOverlay','namesOverlay','mpOverlay','lobbyOverlay','friendsOverlay','notifyOverlay','joinAsOverlay','joinNameOverlay','chatOverlay','tablesOverlay','inviteOverlay'].forEach(function(id){ var el=$(id); if(el) el.classList.remove('on'); }); }
 $('menuBtn').addEventListener('click',function(){
   closeAll();
   var so=$('mpStepOutBtn2'); if(so) so.style.display=(typeof MP!=='undefined' && MP && MP.active && MP.isHost)?'':'none';
@@ -2026,11 +2046,16 @@ function mpSetStatus(txt){ var s=$('mpStatus'); if(s) s.textContent=txt||''; }
 function mpSetLobbyStatus(txt){ var s=$('lobbyStatus'); if(s) s.textContent=txt||''; }
 
 /* ================= Invite — share sheet, text message, copy =================
-   The Invite button uses the phone's own share sheet (Web Share API), so
-   the host picks a contact or Messages right there and the join link goes
-   out as a text. Where no share sheet exists, the "Text the invite" link
-   (an sms: link with the invite prefilled) and Copy link are the fallback,
-   and both are always on screen next to the Invite button. */
+   The Invite button first tries the phone's own share sheet (Web Share
+   API), so the host picks a contact or Messages right there and the join
+   link goes out as a text. But on some phones the share sheet exists yet
+   refuses to open (the promise rejects), and on others there is none at
+   all — in both cases the old behaviour was a toast naming fallback
+   buttons that aren't always on screen (the in-game bar has no Copy
+   button), leaving Invite a dead end. Now any failure to open the share
+   sheet opens the invite sheet instead (mpOpenInviteSheet): the table
+   code, the join link, a Text-the-invite button and a Copy button, all
+   working, right there. */
 function mpSmsHref(){
   if(!MP.code) return '#';
   var body='Join my Spades table! Tap this link to sit down: '+mpRoomLink()+' — it opens the game in your browser, no install needed to play. New to Spades? That page has an "Install the game" button that puts it on your home screen; after installing, open Spades and join with table code '+MP.code+'.';
@@ -2048,27 +2073,47 @@ function mpUpdateInviteUI(){
 }
 function mpInvite(){
   if(!MP.code){ toast('Create or join a table first.'); return; }
-  var link=mpRoomLink();
-  if(navigator.share){
-    navigator.share({
+  mpShareAttempt();
+}
+/* One attempt at the phone's share sheet. If the invite goes out, the
+   sender-only waiting line shows on the table. If the player closes the
+   share sheet themselves, nothing happens. Anything else — the sheet
+   refused to open, or this browser has none — opens the invite sheet
+   with the text/copy routes instead of stranding the player on a toast. */
+function mpShareAttempt(){
+  if(!navigator.share){ mpOpenInviteSheet(); return; }
+  var p;
+  try{
+    p=navigator.share({
       title:'Spades — join my table',
       text:'Join my Spades table! Tap the link to sit down at table '+MP.code+'. It opens in your browser — no install needed to play. If you want the app, that page has an "Install the game" button that adds Spades to your home screen.',
-      url:link
-    }).then(function(){
-      /* The invite actually went out: show the sender-only waiting line
-         on the table until the next player sits down. */
-      mpMarkTextInviteSent();
-    }, function(err){
-      /* The player closing the share sheet is not an error. Anything else:
-         point them at the text-message fallback sitting right there. */
-      if(err && err.name!=='AbortError') toast('Sharing did not open — use “Text the invite” or “Copy the join link” instead.');
+      url:mpRoomLink()
     });
-    return;
-  }
-  /* No share sheet on this browser: the sms: link is the invite route. */
-  toast('No share sheet in this browser — tap “Text the invite” to send it as a text message.');
-  var sms=$('lobbySmsBtn');
-  if(sms && $('lobbyOverlay').classList.contains('on')){ try{ sms.focus(); }catch(e){} }
+  }catch(e){ mpOpenInviteSheet(); return; }
+  Promise.resolve(p).then(function(){
+    /* The invite actually went out: show the sender-only waiting line
+       on the table until the next player sits down, and close the
+       invite sheet if this attempt came from its retry button. */
+    mpMarkTextInviteSent();
+    var ov=$('inviteOverlay'); if(ov) ov.classList.remove('on');
+  }, function(err){
+    /* The player closing the share sheet is not an error. */
+    if(err && err.name==='AbortError') return;
+    mpOpenInviteSheet('The share sheet still won\'t open on this phone — text or copy the link instead.');
+  });
+}
+/* The invite sheet: every working way to invite, on one sheet — the
+   table code big enough to read aloud, the join link, a text-message
+   button with the invite prefilled, and a copy button. Filled fresh
+   each time it opens so it always shows the current table. */
+function mpOpenInviteSheet(note){
+  if(!MP.code) return;
+  var t=$('inviteCodeTitle'); if(t) t.textContent=MP.code;
+  var c=$('inviteCode'); if(c) c.textContent=MP.code;
+  var l=$('inviteLink'); if(l) l.textContent=mpRoomLink();
+  var sms=$('inviteSmsBtn'); if(sms) sms.setAttribute('href', mpSmsHref());
+  var st=$('inviteStatus'); if(st) st.textContent=note||'';
+  $('inviteOverlay').classList.add('on');
 }
 
 /* ================= Table notes: pending invites & joins =================
@@ -5238,6 +5283,22 @@ $('lobbyCopyBtn').addEventListener('click', function(){
     toast('Your table code is '+MP.code+' — the link is shown above.');
   }
 });
+/* Invite sheet (shown when the share sheet won't open): its Text button
+   is the same sms: invite as the lobby's, so it lights the same
+   sender-only waiting line; Copy puts the join link on the clipboard;
+   Done closes only this sheet, so a host who opened it from the lobby
+   lands back in the lobby. */
+$('inviteSmsBtn').addEventListener('click', function(){ mpMarkTextInviteSent(); });
+$('inviteCopyBtn').addEventListener('click', function(){
+  if(!MP.code) return;
+  function done(){ toast('Join link copied — paste it into any message to your friends ♠'); }
+  function fail(){ var st=$('inviteStatus'); if(st) st.textContent='Copy didn\'t work on this phone — the link is shown above; press and hold it to copy, or text the invite instead.'; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(mpRoomLink()).then(done, fail);
+  } else { fail(); }
+});
+$('inviteShareBtn').addEventListener('click', mpShareAttempt);
+$('inviteCloseBtn').addEventListener('click', function(){ $('inviteOverlay').classList.remove('on'); });
 /* Auto-join: opening a ?room=CODE link goes straight to that table.
    With no link, a remembered session (this phone was at a table when the
    app closed) reconnects to the same seat instead — the room kept the
